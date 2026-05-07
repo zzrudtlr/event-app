@@ -387,7 +387,7 @@ function renderParticipants() {
 
   function makeRow(p, i) {
     return `<tr>
-      <td>${i + 1}</td>
+      <td>${i}</td>
       <td><strong>${esc(p.name)}</strong></td>
       <td>${esc(p.grade || '-')}</td>
       <td>${p.age || '-'}</td>
@@ -442,11 +442,11 @@ function renderParticipants() {
         <span class="section-title">👥 참가자 목록 (${App.participants.length}명)</span>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
           <button class="btn btn-primary btn-sm" onclick="openParticipantModal()">+ 직접 추가</button>
-          <button class="btn btn-secondary btn-sm" onclick="openModal('modal-paste')">📋 텍스트 붙여넣기</button>
-          <button class="btn btn-secondary btn-sm" onclick="document.getElementById('file-upload').click()">📁 파일 업로드</button>
-          <input type="file" id="file-upload" accept=".csv,.txt,.xlsx,.xls" style="display:none" onchange="handleFileUpload(this)">
+          <button class="btn btn-secondary btn-sm" onclick="openPasteModal()">📋 텍스트 붙여넣기</button>
+          <button class="btn btn-secondary btn-sm" onclick="openFileUploadModal()">📁 파일 업로드</button>
           <button class="btn btn-secondary btn-sm" onclick="copyAttendLink()">🔗 참석 링크 복사</button>
           ${App.participants.length ? `<button class="btn btn-secondary btn-sm" onclick="exportParticipantsCSV(App.events.find(e=>e.id===App.eventId), App.participants)">⬇ CSV</button>` : ''}
+          ${App.participants.length ? `<button class="btn btn-danger btn-sm" onclick="handleClearAllParticipants()">🗑 전체 초기화</button>` : ''}
         </div>
       </div>
       <div class="table-wrap">${tableHTML}</div>
@@ -519,11 +519,171 @@ async function handleDeleteParticipant(participantId) {
   }
 }
 
+// ---- 참가자 전체 초기화 ----
+async function handleClearAllParticipants() {
+  if (!App.participants.length) return;
+  if (!confirm(`참가자 전체(${App.participants.length}명)를 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) return;
+  try {
+    for (const p of App.participants) await deleteParticipant(App.eventId, p.id);
+    App.participants = [];
+    showToast('참가자 전체가 초기화되었습니다.', 'success');
+    renderParticipants();
+  } catch (e) {
+    showToast('초기화 실패: ' + e.message, 'error');
+  }
+}
+
+// ---- 참가자 텍스트 복사 ----
+function copyParticipantsText() {
+  if (!App.participants.length) { showToast('참가자가 없습니다.', 'error'); return; }
+  const ev   = App.events.find(e => e.id === App.eventId);
+  const opts = ev?.attendOptions?.length ? ev.attendOptions : [];
+  const hasGroups = opts.length > 0 || App.participants.some(p => p.attendType);
+  const icons = { '운동': '🏃', '운동+회식': '🏃🍽', '회식': '🍽', '': '👤' };
+
+  const lines = [];
+  const metaParts = [ev?.eventDate, ev?.location, ev?.organizer].filter(Boolean);
+  lines.push(`=== ${ev?.title || '참가자 명단'} ===`);
+  if (metaParts.length) lines.push(metaParts.join(' · '));
+  lines.push(`총 ${App.participants.length}명`);
+  lines.push('');
+
+  if (hasGroups) {
+    const groupOrder = [...opts];
+    App.participants.forEach(p => { if (p.attendType && !groupOrder.includes(p.attendType)) groupOrder.push(p.attendType); });
+    groupOrder.push('');
+    groupOrder.forEach(key => {
+      const members = App.participants.filter(p => (p.attendType || '') === key);
+      if (!members.length) return;
+      const label = key || '미설정';
+      lines.push(`${icons[key] ?? '👤'} ${label} (${members.length}명)`);
+      members.forEach((p, i) => {
+        const parts = [p.grade, p.gender, p.age ? p.age + '세' : null, p.career ? p.career + '년' : null].filter(Boolean);
+        lines.push(`  ${i + 1}. ${p.name}${parts.length ? ' | ' + parts.join(' | ') : ''}`);
+      });
+      lines.push('');
+    });
+  } else {
+    App.participants.forEach((p, i) => {
+      const parts = [p.grade, p.gender, p.age ? p.age + '세' : null, p.career ? p.career + '년' : null].filter(Boolean);
+      lines.push(`${i + 1}. ${p.name}${parts.length ? ' | ' + parts.join(' | ') : ''}`);
+    });
+  }
+
+  navigator.clipboard.writeText(lines.join('\n')).then(
+    () => showToast('참가자 명단이 복사되었습니다.', 'success'),
+    () => showToast('복사에 실패했습니다.', 'error')
+  );
+}
+
+// ---- 참가자 이미지 다운로드 ----
+async function downloadParticipantsImage() {
+  if (!App.participants.length) { showToast('참가자가 없습니다.', 'error'); return; }
+  if (typeof html2canvas === 'undefined') { showToast('이미지 라이브러리를 불러오는 중입니다. 잠시 후 다시 시도하세요.', 'error'); return; }
+
+  const ev   = App.events.find(e => e.id === App.eventId);
+  const opts = ev?.attendOptions?.length ? ev.attendOptions : [];
+  const hasGroups = opts.length > 0 || App.participants.some(p => p.attendType);
+  const icons = { '운동': '🏃', '운동+회식': '🏃🍽', '회식': '🍽', '': '👤' };
+
+  const s = (t) => String(t || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+  function makeTable(members, startSeq) {
+    const rows = members.map((p, i) => `
+      <tr style="background:${i % 2 ? '#f8fafc' : 'white'}">
+        <td style="padding:7px 10px;color:#94a3b8;font-size:.8rem;width:30px">${startSeq + i}</td>
+        <td style="padding:7px 10px;font-weight:600">${s(p.name)}</td>
+        <td style="padding:7px 10px;color:#4f46e5;font-size:.85rem">${s(p.grade || '-')}</td>
+        <td style="padding:7px 10px;color:${p.gender==='남'?'#2563eb':'#db2777'};font-size:.85rem">${s(p.gender || '-')}</td>
+        <td style="padding:7px 10px;color:#64748b;font-size:.85rem">${p.age ? p.age + '세' : '-'}</td>
+        <td style="padding:7px 10px;color:#64748b;font-size:.85rem">${p.career ? p.career + '년' : '-'}</td>
+      </tr>`).join('');
+    return `<table style="width:100%;border-collapse:collapse;font-family:'Noto Sans KR',sans-serif">
+      <thead><tr style="background:#f1f5f9">
+        <th style="padding:7px 10px;text-align:left;font-size:.75rem;color:#64748b;font-weight:600">#</th>
+        <th style="padding:7px 10px;text-align:left;font-size:.75rem;color:#64748b;font-weight:600">이름</th>
+        <th style="padding:7px 10px;text-align:left;font-size:.75rem;color:#64748b;font-weight:600">급수</th>
+        <th style="padding:7px 10px;text-align:left;font-size:.75rem;color:#64748b;font-weight:600">성별</th>
+        <th style="padding:7px 10px;text-align:left;font-size:.75rem;color:#64748b;font-weight:600">나이</th>
+        <th style="padding:7px 10px;text-align:left;font-size:.75rem;color:#64748b;font-weight:600">경력</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+  }
+
+  let bodyHTML = '';
+  if (hasGroups) {
+    const groupOrder = [...opts];
+    App.participants.forEach(p => { if (p.attendType && !groupOrder.includes(p.attendType)) groupOrder.push(p.attendType); });
+    groupOrder.push('');
+    let seq = 1;
+    groupOrder.forEach(key => {
+      const members = App.participants.filter(p => (p.attendType || '') === key);
+      if (!members.length) return;
+      bodyHTML += `
+        <div style="margin-bottom:18px">
+          <div style="background:#1d4ed8;color:white;padding:8px 14px;border-radius:8px 8px 0 0;font-weight:700;font-size:.9rem">
+            ${icons[key] ?? '👤'} ${s(key || '미설정')} <span style="font-weight:400;opacity:.8">${members.length}명</span>
+          </div>
+          <div style="border:1px solid #e2e8f0;border-top:none;border-radius:0 0 8px 8px;overflow:hidden">
+            ${makeTable(members, seq)}
+          </div>
+        </div>`;
+      seq += members.length;
+    });
+  } else {
+    bodyHTML = `<div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden">${makeTable(App.participants, 1)}</div>`;
+  }
+
+  const metaParts = [ev?.eventDate, ev?.location, ev?.organizer].filter(Boolean).join(' · ');
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:680px;background:white;padding:28px;box-sizing:border-box;font-family:Noto Sans KR,sans-serif';
+  wrap.innerHTML = `
+    <div style="margin-bottom:20px;padding-bottom:16px;border-bottom:2px solid #1d4ed8">
+      <div style="font-size:1.2rem;font-weight:700;color:#1e293b;margin-bottom:4px">${s(ev?.title || '참가자 명단')}</div>
+      ${metaParts ? `<div style="font-size:.85rem;color:#64748b">${s(metaParts)}</div>` : ''}
+      <div style="margin-top:6px;font-size:.8rem;color:#94a3b8">총 ${App.participants.length}명 · ${new Date().toLocaleDateString('ko-KR')} 출력</div>
+    </div>
+    ${bodyHTML}
+  `;
+  document.body.appendChild(wrap);
+
+  try {
+    const canvas = await html2canvas(wrap, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+    const link = document.createElement('a');
+    link.download = `${(ev?.title || '참가자명단').replace(/[\\/:*?"<>|]/g, '_')}_참가자.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+    showToast('이미지로 저장되었습니다.', 'success');
+  } catch (e) {
+    showToast('이미지 생성 실패: ' + e.message, 'error');
+  }
+  document.body.removeChild(wrap);
+}
+
+// ---- 이벤트 기본 attendType 헬퍼 ----
+function getDefaultAttendType() {
+  const ev = App.events.find(e => e.id === App.eventId);
+  const opts = ev?.attendOptions?.length ? ev.attendOptions : ['운동', '운동+회식', '회식'];
+  return opts.includes('운동') ? '운동' : (opts[0] || '운동');
+}
+
+// ---- paste 모달 열기 ----
+function openPasteModal() {
+  const ev = App.events.find(e => e.id === App.eventId);
+  const opts = ev?.attendOptions?.length ? ev.attendOptions : ['운동', '운동+회식', '회식'];
+  const def  = getDefaultAttendType();
+  document.getElementById('paste-attend-type').innerHTML =
+    opts.map(o => `<option value="${o}" ${o === def ? 'selected' : ''}>${o}</option>`).join('');
+  openModal('modal-paste');
+}
+
 // ---- 텍스트 붙여넣기 파싱 ----
 async function handlePasteImport() {
   const text = getVal('paste-text').trim();
   if (!text) { showToast('텍스트를 입력하세요.', 'error'); return; }
-  const parsed = parseParticipantText(text);
+  const attendType = getVal('paste-attend-type') || getDefaultAttendType();
+  const parsed = parseParticipantText(text).map(p => ({ ...p, attendType }));
   if (!parsed.length) { showToast('파싱된 참가자가 없습니다. 형식을 확인해주세요.', 'warning'); return; }
   setBtnLoading('btn-paste-import', true);
   try {
@@ -566,43 +726,57 @@ function parseParticipantText(text) {
   return results;
 }
 
+// ---- 파일 업로드 모달 ----
+function openFileUploadModal() {
+  const ev   = App.events.find(e => e.id === App.eventId);
+  const opts = ev?.attendOptions?.length ? ev.attendOptions : ['운동', '운동+회식', '회식'];
+  const def  = getDefaultAttendType();
+  document.getElementById('file-attend-type').innerHTML =
+    opts.map(o => `<option value="${o}" ${o === def ? 'selected' : ''}>${o}</option>`).join('');
+  document.getElementById('file-upload-input').value = '';
+  document.getElementById('file-upload-name').textContent = '파일을 선택하세요';
+  openModal('modal-file-upload');
+}
+
+function onFileSelected(input) {
+  const name = input.files[0]?.name || '파일을 선택하세요';
+  document.getElementById('file-upload-name').textContent = name;
+}
+
 // ---- 파일 업로드 파싱 ----
-async function handleFileUpload(input) {
-  const file = input.files[0];
-  if (!file) return;
+async function handleFileUpload() {
+  const input = document.getElementById('file-upload-input');
+  const file  = input.files[0];
+  if (!file) { showToast('파일을 선택하세요.', 'error'); return; }
+  const attendType = document.getElementById('file-attend-type').value || getDefaultAttendType();
   const ext = file.name.split('.').pop().toLowerCase();
+  setBtnLoading('btn-file-upload', true);
   try {
     let participants = [];
     if (ext === 'csv' || ext === 'txt') {
-      const text = await file.text();
-      participants = parseParticipantText(text);
+      participants = parseParticipantText(await file.text());
     } else if (ext === 'xlsx' || ext === 'xls') {
       participants = await parseExcelFile(file);
     } else {
       showToast('지원하지 않는 파일 형식입니다. (csv, txt, xlsx, xls)', 'error');
-      input.value = '';
+      setBtnLoading('btn-file-upload', false);
       return;
     }
-
     if (!participants.length) {
       showToast('파싱된 참가자가 없습니다.', 'warning');
-      input.value = '';
+      setBtnLoading('btn-file-upload', false);
       return;
     }
-
-    if (!confirm(`${participants.length}명을 추가하시겠습니까?`)) {
-      input.value = '';
-      return;
-    }
-
+    participants = participants.map(p => ({ ...p, attendType }));
     await addParticipantsBatch(App.eventId, participants);
     App.participants = await getParticipants(App.eventId);
     showToast(`${participants.length}명 추가되었습니다.`, 'success');
+    closeModal('modal-file-upload');
     renderParticipants();
   } catch (e) {
     showToast('파일 처리 실패: ' + e.message, 'error');
   }
-  input.value = '';
+  setBtnLoading('btn-file-upload', false);
 }
 
 function parseExcelFile(file) {
@@ -973,6 +1147,8 @@ function renderPreviewTab() {
         <span class="section-title">🌐 공개 상세페이지 미리보기</span>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
           <button class="btn btn-primary btn-sm" onclick="handleExportHTML()">⬇ HTML 다운로드</button>
+          <button class="btn btn-secondary btn-sm" onclick="copyPreviewText()">📋 텍스트 복사</button>
+          <button class="btn btn-secondary btn-sm" onclick="downloadPreviewImage()">🖼 이미지 저장</button>
           <button class="btn btn-secondary btn-sm" onclick="handleExportJSON()">⬇ JSON 백업</button>
           <button class="btn btn-secondary btn-sm" onclick="handleExportParticipantsCSV()">⬇ 참가자 CSV</button>
           <button class="btn btn-secondary btn-sm" onclick="handlePrint()">🖨 인쇄</button>
@@ -988,6 +1164,114 @@ function renderPreviewTab() {
   const iframe = document.getElementById('preview-iframe');
   iframe.srcdoc = html;
   iframe.style.height = '700px';
+}
+
+function copyPreviewText() {
+  const ev   = App.events.find(e => e.id === App.eventId);
+  if (!ev) return;
+  const opts  = ev?.attendOptions?.length ? ev.attendOptions : [];
+  const icons = { '운동': '🏃', '운동+회식': '🏃🍽', '회식': '🍽', '': '👤' };
+
+  const lines = [];
+  lines.push(`${'='.repeat(40)}`);
+  lines.push(`  ${ev.title}`);
+  const metaParts = [ev.eventDate, ev.location, ev.organizer].filter(Boolean);
+  if (metaParts.length) lines.push(`  ${metaParts.join(' · ')}`);
+  lines.push(`${'='.repeat(40)}`);
+
+  if (ev.content)  lines.push(`\n📌 내용\n${ev.content}`);
+  if (ev.purpose)  lines.push(`\n🎯 목적\n${ev.purpose}`);
+  if (ev.notice)   lines.push(`\n📢 안내사항\n${ev.notice}`);
+
+  // 참가자
+  if (App.participants.length) {
+    lines.push(`\n👥 참가자 (${App.participants.length}명)`);
+    const hasGroups = opts.length > 0 || App.participants.some(p => p.attendType);
+    if (hasGroups) {
+      const groupOrder = [...opts];
+      App.participants.forEach(p => { if (p.attendType && !groupOrder.includes(p.attendType)) groupOrder.push(p.attendType); });
+      groupOrder.push('');
+      groupOrder.forEach(key => {
+        const members = App.participants.filter(p => (p.attendType || '') === key);
+        if (!members.length) return;
+        lines.push(`\n  ${icons[key] ?? '👤'} ${key || '미설정'} (${members.length}명)`);
+        members.forEach((p, i) => {
+          const parts = [p.grade, p.gender, p.age ? p.age + '세' : null, p.career ? p.career + '년' : null].filter(Boolean);
+          lines.push(`    ${i + 1}. ${p.name}${parts.length ? ' | ' + parts.join(' · ') : ''}`);
+        });
+      });
+    } else {
+      App.participants.forEach((p, i) => {
+        const parts = [p.grade, p.gender, p.age ? p.age + '세' : null, p.career ? p.career + '년' : null].filter(Boolean);
+        lines.push(`  ${i + 1}. ${p.name}${parts.length ? ' | ' + parts.join(' · ') : ''}`);
+      });
+    }
+  }
+
+  // 찬조자
+  if (App.sponsors.length) {
+    lines.push(`\n🤝 찬조자 (${App.sponsors.length}명)`);
+    App.sponsors.forEach((s, i) => {
+      lines.push(`  ${i + 1}. ${s.name}${s.affiliation ? ' (' + s.affiliation + ')' : ''}${s.type ? ' [' + s.type + ']' : ''}`);
+    });
+  }
+
+  // 찬조물품
+  if (App.sponsorItems.length) {
+    lines.push(`\n🎁 찬조물품 (${App.sponsorItems.length}건)`);
+    App.sponsorItems.forEach((item, i) => {
+      lines.push(`  ${i + 1}. ${item.itemName}${item.quantity ? ' × ' + item.quantity : ''}${item.sponsorName ? ' — ' + item.sponsorName : ''}`);
+    });
+  }
+
+  // 운영진
+  if (App.staff.length) {
+    lines.push(`\n🛠 운영진 (${App.staff.length}명)`);
+    App.staff.forEach((s, i) => {
+      lines.push(`  ${i + 1}. ${s.name}${s.role ? ' [' + s.role + ']' : ''}${s.task ? ' — ' + s.task : ''}`);
+    });
+  }
+
+  lines.push(`\n${'='.repeat(40)}`);
+  lines.push(`출력: ${new Date().toLocaleDateString('ko-KR')}`);
+
+  navigator.clipboard.writeText(lines.join('\n')).then(
+    () => showToast('미리보기 텍스트가 복사되었습니다.', 'success'),
+    () => showToast('복사에 실패했습니다.', 'error')
+  );
+}
+
+async function downloadPreviewImage() {
+  if (typeof html2canvas === 'undefined') {
+    showToast('이미지 라이브러리를 불러오는 중입니다. 잠시 후 다시 시도하세요.', 'error');
+    return;
+  }
+  const iframe = document.getElementById('preview-iframe');
+  if (!iframe) { showToast('미리보기를 먼저 열어주세요.', 'error'); return; }
+  const ev = App.events.find(e => e.id === App.eventId);
+
+  showToast('이미지 생성 중...', 'default');
+  try {
+    const target = iframe.contentDocument?.body || iframe.contentWindow?.document?.body;
+    if (!target) throw new Error('미리보기 내용을 찾을 수 없습니다.');
+
+    const canvas = await html2canvas(target, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: '#ffffff',
+      scrollX: 0,
+      scrollY: 0,
+      windowWidth: target.scrollWidth,
+      windowHeight: target.scrollHeight,
+    });
+    const link = document.createElement('a');
+    link.download = `${(ev?.title || '미리보기').replace(/[\\/:*?"<>|]/g, '_')}_미리보기.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+    showToast('이미지로 저장되었습니다.', 'success');
+  } catch (e) {
+    showToast('이미지 생성 실패: ' + e.message, 'error');
+  }
 }
 
 function handleExportHTML() {

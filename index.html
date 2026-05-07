@@ -21,6 +21,9 @@
   <!-- SheetJS (Excel 파싱) -->
   <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
 
+  <!-- html2canvas (참가자 이미지 다운로드) -->
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+
   <!-- Custom Styles -->
   <link rel="stylesheet" href="style.css">
 </head>
@@ -335,6 +338,11 @@ service cloud.firestore {
     </div>
 
     <div class="form-group">
+      <label class="form-label" for="paste-attend-type">참석 구분</label>
+      <select id="paste-attend-type" class="form-select"></select>
+    </div>
+
+    <div class="form-group">
       <label class="form-label" for="paste-text">참가자 정보 붙여넣기</label>
       <textarea id="paste-text" class="form-textarea"
         style="min-height:200px;font-family:monospace;font-size:.85rem"
@@ -344,6 +352,36 @@ service cloud.firestore {
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:4px">
       <button class="btn btn-secondary" onclick="closeModal('modal-paste')">취소</button>
       <button id="btn-paste-import" class="btn btn-primary" onclick="handlePasteImport()">가져오기</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     모달: 파일 업로드
+     ============================================================ -->
+<div id="modal-file-upload" class="modal-overlay" role="dialog" aria-modal="true">
+  <div class="modal-box" style="max-width:440px">
+    <h2 class="modal-title">📁 파일로 참가자 추가</h2>
+
+    <div class="form-group">
+      <label class="form-label">참석 구분</label>
+      <select id="file-attend-type" class="form-select"></select>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">파일 선택 <span style="font-weight:400;color:#64748b">(csv, txt, xlsx, xls)</span></label>
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;border:1.5px dashed #cbd5e1;border-radius:8px;padding:12px 14px;transition:border-color .15s"
+             onmouseenter="this.style.borderColor='#3b82f6'" onmouseleave="this.style.borderColor='#cbd5e1'">
+        <input id="file-upload-input" type="file" accept=".csv,.txt,.xlsx,.xls"
+               style="display:none" onchange="onFileSelected(this)">
+        <span class="btn btn-secondary btn-sm" onclick="document.getElementById('file-upload-input').click()">파일 선택</span>
+        <span id="file-upload-name" style="font-size:.85rem;color:#64748b;word-break:break-all">파일을 선택하세요</span>
+      </label>
+    </div>
+
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:4px">
+      <button class="btn btn-secondary" onclick="closeModal('modal-file-upload')">취소</button>
+      <button id="btn-file-upload" class="btn btn-primary" onclick="handleFileUpload()">가져오기</button>
     </div>
   </div>
 </div>

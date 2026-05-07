@@ -20,6 +20,10 @@ const GRP = {
   _eventId: null,
 };
 
+function grpSportParticipants() {
+  return App.participants.filter(p => !p.attendType || p.attendType !== '회식');
+}
+
 function grpScore(p) {
   const g = String(p.grade || '').trim();
   return GRADE_SCORES_G[g] || GRADE_SCORES_G[g.toUpperCase()] || 1;
@@ -43,9 +47,10 @@ function renderGroupingTab() {
   const panel = document.getElementById('panel-grouping');
   if (!panel) return;
 
-  const total   = App.participants.length;
-  const maleN   = App.participants.filter(p => p.gender === '남').length;
-  const femaleN = App.participants.filter(p => p.gender === '여').length;
+  const sportP  = grpSportParticipants();
+  const total   = sportP.length;
+  const maleN   = sportP.filter(p => p.gender === '남').length;
+  const femaleN = sportP.filter(p => p.gender === '여').length;
 
   if (total === 0) {
     panel.innerHTML = `<div class="empty-state"><div class="icon">👥</div><p>참가자 탭에서 먼저 참가자를 등록해주세요.</p></div>`;
@@ -135,8 +140,9 @@ function grpOnDoublesChange() {
   const box = document.getElementById('grp-info-box');
   if (!box) return;
 
-  const maleN   = App.participants.filter(p => p.gender === '남').length;
-  const femaleN = App.participants.filter(p => p.gender === '여').length;
+  const sportP2 = grpSportParticipants();
+  const maleN   = sportP2.filter(p => p.gender === '남').length;
+  const femaleN = sportP2.filter(p => p.gender === '여').length;
 
   const infoMap = {
     none:  null,
@@ -164,14 +170,15 @@ function grpGenerate() {
   GRP.roundSwaps     = {};
   GRP.roundEditMode  = null;
 
-  if (App.participants.length < 2) {
+  const sportPool = grpSportParticipants();
+  if (sportPool.length < 2) {
     showToast('최소 2명 이상의 참가자가 필요합니다.', 'error');
     return;
   }
 
   if (GRP.doublesType === 'both') {
-    const men   = grpEnriched(App.participants.filter(p => p.gender === '남'));
-    const women = grpEnriched(App.participants.filter(p => p.gender === '여'));
+    const men   = grpEnriched(sportPool.filter(p => p.gender === '남'));
+    const women = grpEnriched(sportPool.filter(p => p.gender === '여'));
     if (men.length < 2)   { showToast('남복 생성을 위해 남자 참가자가 최소 2명 필요합니다.', 'error'); return; }
     if (women.length < 2) { showToast('여복 생성을 위해 여자 참가자가 최소 2명 필요합니다.', 'error'); return; }
     GRP.results = {
@@ -180,7 +187,7 @@ function grpGenerate() {
       groups: null,
     };
   } else {
-    const pool = grpGetPool(GRP.doublesType);
+    const pool = grpGetPool(GRP.doublesType, sportPool);
     if (typeof pool === 'string') { showToast(pool, 'error'); return; }
     GRP.results = {
       doublesType: GRP.doublesType,
@@ -198,8 +205,8 @@ function grpBuildSection(type, pool) {
   return { type, label: type === 'men' ? '남복' : '여복', groups: grpFormGroups(pool, type) };
 }
 
-function grpGetPool(doublesType) {
-  const p = App.participants;
+function grpGetPool(doublesType, p) {
+  if (!p) p = grpSportParticipants();
   if (doublesType === 'men') {
     const m = p.filter(x => x.gender === '남');
     if (m.length < 2) return `남복 선택 시 남자 참가자가 최소 2명 필요합니다. (현재 ${m.length}명)`;
@@ -767,7 +774,7 @@ function grpRenderAddList() {
   const query   = (document.getElementById('grp-add-search')?.value || '').toLowerCase();
   const list    = document.getElementById('grp-add-list');
   const empty   = document.getElementById('grp-add-empty');
-  const filtered = App.participants.filter(p => !query || (p.name||'').toLowerCase().includes(query));
+  const filtered = grpSportParticipants().filter(p => !query || (p.name||'').toLowerCase().includes(query));
 
   if (!filtered.length) { list.innerHTML = ''; empty.classList.remove('hidden'); return; }
   empty.classList.add('hidden');
@@ -807,7 +814,7 @@ function grpSubmitAdd() {
   if (!checked.length) { showToast('추가할 참가자를 선택해주세요.', 'error'); return; }
   const ids  = new Set(checked.map(cb => String(cb.value)));
   const flat = grpFlatGroups();
-  const toAdd = App.participants
+  const toAdd = grpSportParticipants()
     .filter(p => ids.has(String(p.id)))
     .map(p => ({ ...p, score: grpScore(p) }));
   toAdd.forEach(p => flat[GRP.groupAddTargetIdx].members.push(p));

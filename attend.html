@@ -7,9 +7,157 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Noto Sans KR', -apple-system, sans-serif;
+      background: #f1f5f9;
+      min-height: 100vh;
+      color: #1e293b;
+    }
+
+    .wrap {
+      max-width: 480px;
+      margin: 0 auto;
+      padding: 24px 16px 48px;
+    }
+    .card {
+      background: white;
+      border-radius: 16px;
+      padding: 28px 22px;
+      box-shadow: 0 2px 16px rgba(0,0,0,.09);
+    }
+    .card-title {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #1e293b;
+      margin-bottom: 20px;
+    }
+
+    /* 폼 */
+    .form-group { margin-bottom: 14px; }
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .form-label {
+      display: block;
+      font-size: .8rem;
+      font-weight: 600;
+      color: #374151;
+      margin-bottom: 5px;
+    }
+    .required { color: #ef4444; margin-left: 2px; }
+    .form-input, .form-select {
+      width: 100%;
+      padding: 9px 12px;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: .9rem;
+      color: #1e293b;
+      background: white;
+      outline: none;
+      font-family: inherit;
+      transition: border-color .15s;
+    }
+    .form-input:focus, .form-select:focus {
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59,130,246,.1);
+    }
+
+    /* 참석 옵션 라디오 */
+    .attend-option-label {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 13px 16px;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: .95rem;
+      font-weight: 500;
+      color: #374151;
+      transition: border-color .15s, background .15s;
+    }
+    .attend-option-label:has(input:checked) {
+      border-color: #1d4ed8;
+      background: #eff6ff;
+      color: #1d4ed8;
+    }
+    .attend-option-label input[type="radio"] {
+      accent-color: #1d4ed8;
+      width: 16px;
+      height: 16px;
+      flex-shrink: 0;
+    }
+
+    /* 버튼 */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      padding: 8px 16px;
+      border-radius: 8px;
+      border: none;
+      font-size: .875rem;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all .15s;
+    }
+    .btn:disabled { opacity: .5; cursor: not-allowed; }
+    .btn-primary  { background: #1d4ed8; color: white; }
+    .btn-primary:hover:not(:disabled) { background: #1e40af; }
+    .btn-outline  { background: white; color: #1d4ed8; border: 1.5px solid #1d4ed8; }
+    .btn-outline:hover:not(:disabled) { background: #eff6ff; }
+
+    /* 스피너 */
+    .spinner {
+      display: inline-block;
+      width: 18px; height: 18px;
+      border: 2.5px solid rgba(255,255,255,.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* 토스트 */
+    .toast-container {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      align-items: center;
+      pointer-events: none;
+    }
+    .toast {
+      padding: 10px 18px;
+      border-radius: 10px;
+      font-size: .875rem;
+      font-weight: 500;
+      color: white;
+      background: #1e293b;
+      box-shadow: 0 4px 12px rgba(0,0,0,.15);
+      animation: fadeIn .2s ease;
+    }
+    .toast-error   { background: #dc2626; }
+    .toast-success { background: #059669; }
+    @keyframes fadeIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+
+    /* 빈 상태 */
+    .empty-state { text-align: center; padding: 40px 20px; color: #94a3b8; }
+    .empty-state .icon { font-size: 2.5rem; margin-bottom: 10px; }
+  </style>
 </head>
-<body style="background:#f1f5f9;min-height:100vh">
+<body>
 
 <!-- 헤더 -->
 <div style="background:linear-gradient(135deg,#1d4ed8,#3b82f6);color:white;padding:28px 20px;text-align:center">
@@ -18,9 +166,9 @@
   <p id="attend-meta" style="font-size:.85rem;opacity:.85;margin-top:6px"></p>
 </div>
 
-<!-- 폼 영역 -->
-<div style="max-width:480px;margin:0 auto;padding:24px 16px 48px">
-  <div id="attend-wrap" style="background:white;border-radius:16px;padding:28px 22px;box-shadow:0 2px 16px rgba(0,0,0,.09)">
+<!-- 폼 -->
+<div class="wrap">
+  <div id="attend-wrap" class="card">
     <div class="empty-state"><div class="icon">⏳</div><p>로딩 중...</p></div>
   </div>
 </div>
@@ -29,13 +177,12 @@
 
 <script>
 // =====================================================
-// Firestore REST API 설정 (Firebase SDK 없이 동작)
+// Firestore REST API (Firebase SDK 없이 file:// 동작)
 // =====================================================
 const PROJECT_ID = 'event-app-660e5';
 const API_KEY    = 'AIzaSyDYqBT-O2OuditfSHzz8T0CqRR4yWLMxw8';
 const FS_BASE    = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
 
-// Firestore 문서 필드 파싱
 function parseField(f) {
   if (!f) return null;
   if ('stringValue'    in f) return f.stringValue;
@@ -52,8 +199,6 @@ function parseFields(fields) {
   for (const [k, v] of Object.entries(fields || {})) obj[k] = parseField(v);
   return obj;
 }
-
-// JS 값 → Firestore 필드
 function toField(v) {
   if (v === null || v === undefined || v === '') return null;
   if (typeof v === 'string')  return { stringValue: v };
@@ -62,7 +207,6 @@ function toField(v) {
   return { stringValue: String(v) };
 }
 
-// 이벤트 조회
 async function fetchEvent(eventId) {
   const res = await fetch(`${FS_BASE}/events/${eventId}?key=${API_KEY}`);
   if (res.status === 404) throw new Error('이벤트를 찾을 수 없습니다.');
@@ -71,7 +215,6 @@ async function fetchEvent(eventId) {
   return { id: eventId, ...parseFields(doc.fields) };
 }
 
-// 참가자 추가
 async function submitParticipant(eventId, data) {
   const fields = {};
   for (const [k, v] of Object.entries(data)) {
@@ -79,14 +222,9 @@ async function submitParticipant(eventId, data) {
     if (f !== null) fields[k] = f;
   }
   fields.createdAt = { timestampValue: new Date().toISOString() };
-
   const res = await fetch(
     `${FS_BASE}/events/${eventId}/participants?key=${API_KEY}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fields }),
-    }
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fields }) }
   );
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -111,14 +249,8 @@ function showToast(msg, type = 'info') {
 function setBtnLoading(id, loading) {
   const btn = document.getElementById(id);
   if (!btn) return;
-  if (loading) {
-    btn._orig = btn.innerHTML;
-    btn.innerHTML = '<span class="spinner"></span>';
-    btn.disabled = true;
-  } else {
-    btn.innerHTML = btn._orig || '신청';
-    btn.disabled = false;
-  }
+  if (loading) { btn._orig = btn.innerHTML; btn.innerHTML = '<span class="spinner"></span>'; btn.disabled = true; }
+  else { btn.innerHTML = btn._orig || '신청'; btn.disabled = false; }
 }
 
 // =====================================================
@@ -155,14 +287,14 @@ function renderForm(ev) {
     ? ev.attendOptions
     : ['운동', '운동+회식', '회식'];
 
-  const optHTML = opts.map(o => `
+  const optHTML = opts.map((o, i) => `
     <label class="attend-option-label">
-      <input type="radio" name="attend-type" value="${esc(o)}">
+      <input type="radio" name="attend-type" value="${esc(o)}" ${i === 0 ? 'checked' : ''}>
       <span>${esc(o)}</span>
     </label>`).join('');
 
   document.getElementById('attend-wrap').innerHTML = `
-    <h2 style="font-size:1rem;font-weight:700;color:#1e293b;margin-bottom:20px">참석 신청</h2>
+    <p class="card-title">참석 신청</p>
 
     <div class="form-group">
       <label class="form-label">이름 <span class="required">*</span></label>
@@ -203,7 +335,7 @@ function renderForm(ev) {
     </div>
 
     <button id="btn-submit" class="btn btn-primary"
-      style="width:100%;justify-content:center;padding:12px;font-size:.95rem;margin-top:20px"
+      style="width:100%;padding:12px;font-size:.95rem;margin-top:20px"
       onclick="handleSubmit()">참석 신청하기</button>
   `;
 }
