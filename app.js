@@ -15,6 +15,7 @@ const App = {
   editingId: null,    // 현재 수정 중인 항목 ID
   sponsorSearch: '',  // 찬조자 검색어
   currentUser: null,
+  previewSections: { participants: true, sponsors: true, sponsorItems: true, staff: true, grouping: true },
 };
 
 // =====================================================
@@ -1137,10 +1138,43 @@ async function handleDeleteStaff(staffId) {
 // =====================================================
 // 미리보기 / 내보내기 탭
 // =====================================================
+function getPreviewData() {
+  const sec = App.previewSections;
+  return {
+    participants: sec.participants ? App.participants : null,
+    sponsors:     sec.sponsors     ? App.sponsors     : null,
+    sponsorItems: sec.sponsorItems ? App.sponsorItems : null,
+    staff:        sec.staff        ? App.staff        : null,
+  };
+}
+
+function onPreviewSectionToggle() {
+  App.previewSections = {
+    participants: document.getElementById('prev-show-participants').checked,
+    sponsors:     document.getElementById('prev-show-sponsors').checked,
+    sponsorItems: document.getElementById('prev-show-sponsor-items').checked,
+    staff:        document.getElementById('prev-show-staff').checked,
+    grouping:     document.getElementById('prev-show-grouping').checked,
+  };
+  const ev = App.events.find(e => e.id === App.eventId);
+  const d  = getPreviewData();
+  const grpHTML = (App.previewSections.grouping && typeof grpBuildPublicHTML === 'function') ? grpBuildPublicHTML() : '';
+  const iframe  = document.getElementById('preview-iframe');
+  if (iframe) iframe.srcdoc = buildPublicHTML(ev, d.participants, d.sponsors, d.sponsorItems, d.staff, grpHTML);
+}
+
 function renderPreviewTab() {
   const ev = App.events.find(e => e.id === App.eventId);
   if (!ev) return;
   const panel = document.getElementById('panel-preview');
+  const sec   = App.previewSections;
+
+  const chk = (id, key, label) =>
+    `<label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:.875rem;user-select:none">
+      <input type="checkbox" id="${id}" ${sec[key] ? 'checked' : ''} onchange="onPreviewSectionToggle()">
+      ${label}
+    </label>`;
+
   panel.innerHTML = `
     <div class="section-card">
       <div class="section-header">
@@ -1154,14 +1188,23 @@ function renderPreviewTab() {
           <button class="btn btn-secondary btn-sm" onclick="handlePrint()">🖨 인쇄</button>
         </div>
       </div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;padding:10px 14px;background:#f8fafc;border-radius:8px;margin-bottom:12px;align-items:center">
+        <span style="font-size:.8rem;font-weight:600;color:#64748b">표시 항목:</span>
+        ${chk('prev-show-participants', 'participants', '👥 참가자')}
+        ${chk('prev-show-sponsors',    'sponsors',     '🤝 찬조자')}
+        ${chk('prev-show-sponsor-items','sponsorItems','🎁 찬조물품')}
+        ${chk('prev-show-staff',       'staff',        '🛠 운영진')}
+        ${chk('prev-show-grouping',    'grouping',     '🏟 조편성')}
+      </div>
       <div class="preview-frame">
         <iframe id="preview-iframe" sandbox="allow-same-origin" title="이벤트 미리보기"></iframe>
       </div>
     </div>`;
 
-  const grpHTML = typeof grpBuildPublicHTML === 'function' ? grpBuildPublicHTML() : '';
-  const html = buildPublicHTML(ev, App.participants, App.sponsors, App.sponsorItems, App.staff, grpHTML);
-  const iframe = document.getElementById('preview-iframe');
+  const d       = getPreviewData();
+  const grpHTML = (sec.grouping && typeof grpBuildPublicHTML === 'function') ? grpBuildPublicHTML() : '';
+  const html    = buildPublicHTML(ev, d.participants, d.sponsors, d.sponsorItems, d.staff, grpHTML);
+  const iframe  = document.getElementById('preview-iframe');
   iframe.srcdoc = html;
   iframe.style.height = '700px';
 }
@@ -1179,20 +1222,21 @@ function copyPreviewText() {
   if (metaParts.length) lines.push(`  ${metaParts.join(' · ')}`);
   lines.push(`${'='.repeat(40)}`);
 
-  if (ev.content)  lines.push(`\n📌 내용\n${ev.content}`);
-  if (ev.purpose)  lines.push(`\n🎯 목적\n${ev.purpose}`);
-  if (ev.notice)   lines.push(`\n📢 안내사항\n${ev.notice}`);
+  if (ev.content) lines.push(`\n📌 내용\n${ev.content}`);
+  if (ev.purpose) lines.push(`\n🎯 목적\n${ev.purpose}`);
+  if (ev.notice)  lines.push(`\n📢 안내사항\n${ev.notice}`);
 
-  // 참가자
-  if (App.participants.length) {
-    lines.push(`\n👥 참가자 (${App.participants.length}명)`);
-    const hasGroups = opts.length > 0 || App.participants.some(p => p.attendType);
+  const d = getPreviewData();
+
+  if (d.participants !== null && d.participants.length) {
+    lines.push(`\n👥 참가자 (${d.participants.length}명)`);
+    const hasGroups = opts.length > 0 || d.participants.some(p => p.attendType);
     if (hasGroups) {
       const groupOrder = [...opts];
-      App.participants.forEach(p => { if (p.attendType && !groupOrder.includes(p.attendType)) groupOrder.push(p.attendType); });
+      d.participants.forEach(p => { if (p.attendType && !groupOrder.includes(p.attendType)) groupOrder.push(p.attendType); });
       groupOrder.push('');
       groupOrder.forEach(key => {
-        const members = App.participants.filter(p => (p.attendType || '') === key);
+        const members = d.participants.filter(p => (p.attendType || '') === key);
         if (!members.length) return;
         lines.push(`\n  ${icons[key] ?? '👤'} ${key || '미설정'} (${members.length}명)`);
         members.forEach((p, i) => {
@@ -1201,35 +1245,37 @@ function copyPreviewText() {
         });
       });
     } else {
-      App.participants.forEach((p, i) => {
+      d.participants.forEach((p, i) => {
         const parts = [p.grade, p.gender, p.age ? p.age + '세' : null, p.career ? p.career + '년' : null].filter(Boolean);
         lines.push(`  ${i + 1}. ${p.name}${parts.length ? ' | ' + parts.join(' · ') : ''}`);
       });
     }
   }
 
-  // 찬조자
-  if (App.sponsors.length) {
-    lines.push(`\n🤝 찬조자 (${App.sponsors.length}명)`);
-    App.sponsors.forEach((s, i) => {
+  if (d.sponsors !== null && d.sponsors.length) {
+    lines.push(`\n🤝 찬조자 (${d.sponsors.length}명)`);
+    d.sponsors.forEach((s, i) => {
       lines.push(`  ${i + 1}. ${s.name}${s.affiliation ? ' (' + s.affiliation + ')' : ''}${s.type ? ' [' + s.type + ']' : ''}`);
     });
   }
 
-  // 찬조물품
-  if (App.sponsorItems.length) {
-    lines.push(`\n🎁 찬조물품 (${App.sponsorItems.length}건)`);
-    App.sponsorItems.forEach((item, i) => {
+  if (d.sponsorItems !== null && d.sponsorItems.length) {
+    lines.push(`\n🎁 찬조물품 (${d.sponsorItems.length}건)`);
+    d.sponsorItems.forEach((item, i) => {
       lines.push(`  ${i + 1}. ${item.itemName}${item.quantity ? ' × ' + item.quantity : ''}${item.sponsorName ? ' — ' + item.sponsorName : ''}`);
     });
   }
 
-  // 운영진
-  if (App.staff.length) {
-    lines.push(`\n🛠 운영진 (${App.staff.length}명)`);
-    App.staff.forEach((s, i) => {
+  if (d.staff !== null && d.staff.length) {
+    lines.push(`\n🛠 운영진 (${d.staff.length}명)`);
+    d.staff.forEach((s, i) => {
       lines.push(`  ${i + 1}. ${s.name}${s.role ? ' [' + s.role + ']' : ''}${s.task ? ' — ' + s.task : ''}`);
     });
+  }
+
+  if (App.previewSections.grouping && typeof grpBuildTXT === 'function' && GRP.results) {
+    lines.push(`\n🏟 조편성 결과`);
+    lines.push(grpBuildTXT());
   }
 
   lines.push(`\n${'='.repeat(40)}`);
@@ -1276,8 +1322,9 @@ async function downloadPreviewImage() {
 
 function handleExportHTML() {
   const ev = App.events.find(e => e.id === App.eventId);
-  const grpHTML = typeof grpBuildPublicHTML === 'function' ? grpBuildPublicHTML() : '';
-  exportAsHTML(ev, App.participants, App.sponsors, App.sponsorItems, App.staff, grpHTML);
+  const d  = getPreviewData();
+  const grpHTML = (App.previewSections.grouping && typeof grpBuildPublicHTML === 'function') ? grpBuildPublicHTML() : '';
+  exportAsHTML(ev, d.participants, d.sponsors, d.sponsorItems, d.staff, grpHTML);
 }
 function handleExportJSON() {
   const ev = App.events.find(e => e.id === App.eventId);
@@ -1289,8 +1336,9 @@ function handleExportParticipantsCSV() {
 }
 function handlePrint() {
   const ev = App.events.find(e => e.id === App.eventId);
-  const grpHTML = typeof grpBuildPublicHTML === 'function' ? grpBuildPublicHTML() : '';
-  printPreview(ev, App.participants, App.sponsors, App.sponsorItems, App.staff, grpHTML);
+  const d  = getPreviewData();
+  const grpHTML = (App.previewSections.grouping && typeof grpBuildPublicHTML === 'function') ? grpBuildPublicHTML() : '';
+  printPreview(ev, d.participants, d.sponsors, d.sponsorItems, d.staff, grpHTML);
 }
 
 // =====================================================

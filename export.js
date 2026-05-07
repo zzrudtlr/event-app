@@ -80,58 +80,106 @@ function buildPublicHTML(event, participants, sponsors, sponsorItems, staff, gro
   const formatDate = (d) => d ? d.replace(/-/g, '.') : '-';
   const safe = (v) => String(v || '-').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-  const participantRows = participants.length
-    ? participants.map((p, i) => `
-      <tr>
-        <td>${i + 1}</td>
-        <td><strong>${safe(p.name)}</strong></td>
-        <td>${safe(p.grade)}</td>
-        <td>${safe(p.age)}</td>
-        <td>${safe(p.career)}</td>
-        <td>${safe(p.gender)}</td>
-        <td>${safe(p.affiliation)}</td>
-        <td>${safe(p.memo)}</td>
-      </tr>`).join('')
-    : `<tr><td colspan="8" class="empty">참가자 없음</td></tr>`;
+  const participantsSection = participants !== null ? (() => {
+    const rows = participants.length
+      ? participants.map((p, i) => `
+        <tr>
+          <td>${i + 1}</td>
+          <td><strong>${safe(p.name)}</strong></td>
+          <td>${safe(p.grade)}</td>
+          <td>${safe(p.age)}</td>
+          <td>${safe(p.career)}</td>
+          <td>${safe(p.gender)}</td>
+          <td>${safe(p.affiliation)}</td>
+          <td>${safe(p.memo)}</td>
+        </tr>`).join('')
+      : `<tr><td colspan="8" class="empty">참가자 없음</td></tr>`;
+    return `
+  <div class="card">
+    <h2>👥 참가자 목록 (총 ${participants.length}명)</h2>
+    <div style="overflow-x:auto">
+      <table>
+        <thead><tr><th>#</th><th>이름</th><th>급수</th><th>나이</th><th>경력</th><th>성별</th><th>소속</th><th>비고</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  </div>`;
+  })() : '';
 
-  const sponsorRows = sponsors.length
-    ? sponsors.map((s, i) => `
-      <tr>
-        <td>${i + 1}</td>
-        <td><strong>${safe(s.name)}</strong></td>
-        <td>${safe(s.affiliation)}</td>
-        <td>${safe(s.type)}</td>
-        <td>${safe(s.phone)}</td>
-        <td>${safe(s.memo)}</td>
-      </tr>`).join('')
-    : `<tr><td colspan="6" class="empty">찬조자 없음</td></tr>`;
+  const sponsorsSection = sponsors !== null ? (() => {
+    const rows = sponsors.length
+      ? sponsors.map((s, i) => `
+        <tr>
+          <td>${i + 1}</td>
+          <td><strong>${safe(s.name)}</strong></td>
+          <td>${safe(s.affiliation)}</td>
+          <td>${safe(s.type)}</td>
+          <td>${safe(s.phone)}</td>
+          <td>${safe(s.memo)}</td>
+        </tr>`).join('')
+      : `<tr><td colspan="6" class="empty">찬조자 없음</td></tr>`;
+    return `
+  <div class="card">
+    <h2>🤝 찬조자 목록 (총 ${sponsors.length}명)</h2>
+    <div style="overflow-x:auto">
+      <table>
+        <thead><tr><th>#</th><th>찬조자명</th><th>소속</th><th>찬조구분</th><th>연락처</th><th>메모</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  </div>`;
+  })() : '';
 
-  const sponsorItemRows = sponsorItems.length
-    ? sponsorItems.map((item, i) => `
-      <tr>
-        <td>${i + 1}</td>
-        <td><strong>${safe(item.itemName)}</strong></td>
-        <td>${safe(item.quantity)}</td>
-        <td>${item.amount ? Number(item.amount).toLocaleString() + '원' : '-'}</td>
-        <td>${safe(item.sponsorName)}</td>
-        <td>${safe(item.usage)}</td>
-        <td>${safe(item.memo)}</td>
-      </tr>`).join('')
-    : `<tr><td colspan="7" class="empty">찬조물품 없음</td></tr>`;
+  const sponsorItemsSection = sponsorItems !== null ? (() => {
+    const totalAmount = sponsorItems.reduce((sum, i) => sum + (Number(i.amount) || 0), 0);
+    const rows = sponsorItems.length
+      ? sponsorItems.map((item, i) => `
+        <tr>
+          <td>${i + 1}</td>
+          <td><strong>${safe(item.itemName)}</strong></td>
+          <td>${safe(item.quantity)}</td>
+          <td>${item.amount ? Number(item.amount).toLocaleString() + '원' : '-'}</td>
+          <td>${safe(item.sponsorName)}</td>
+          <td>${safe(item.usage)}</td>
+          <td>${safe(item.memo)}</td>
+        </tr>`).join('')
+      : `<tr><td colspan="7" class="empty">찬조물품 없음</td></tr>`;
+    return `
+  <div class="card">
+    <h2>🎁 찬조물품 목록 (총 ${sponsorItems.length}건)</h2>
+    <div style="overflow-x:auto">
+      <table>
+        <thead><tr><th>#</th><th>물품명</th><th>수량</th><th>금액</th><th>찬조자</th><th>사용처</th><th>비고</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+    ${totalAmount > 0 ? `<div class="summary"><div class="summary-item"><div class="num">${totalAmount.toLocaleString()}원</div><div class="lbl">총 찬조금액</div></div><div class="summary-item"><div class="num">${sponsorItems.length}건</div><div class="lbl">총 물품 수</div></div></div>` : ''}
+  </div>`;
+  })() : '';
 
-  const staffRows = staff.length
-    ? staff.map((s, i) => `
-      <tr>
-        <td>${i + 1}</td>
-        <td><strong>${safe(s.name)}</strong></td>
-        <td>${safe(s.role)}</td>
-        <td>${safe(s.phone)}</td>
-        <td>${safe(s.task)}</td>
-        <td>${safe(s.memo)}</td>
-      </tr>`).join('')
-    : `<tr><td colspan="6" class="empty">운영진 없음</td></tr>`;
-
-  const totalAmount = sponsorItems.reduce((sum, i) => sum + (Number(i.amount) || 0), 0);
+  const staffSection = staff !== null ? (() => {
+    const rows = staff.length
+      ? staff.map((s, i) => `
+        <tr>
+          <td>${i + 1}</td>
+          <td><strong>${safe(s.name)}</strong></td>
+          <td>${safe(s.role)}</td>
+          <td>${safe(s.phone)}</td>
+          <td>${safe(s.task)}</td>
+          <td>${safe(s.memo)}</td>
+        </tr>`).join('')
+      : `<tr><td colspan="6" class="empty">운영진 없음</td></tr>`;
+    return `
+  <div class="card">
+    <h2>🛠 운영진 목록 (총 ${staff.length}명)</h2>
+    <div style="overflow-x:auto">
+      <table>
+        <thead><tr><th>#</th><th>이름</th><th>역할</th><th>연락처</th><th>담당업무</th><th>비고</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  </div>`;
+  })() : '';
 
   return `<!DOCTYPE html>
 <html lang="ko">
@@ -202,46 +250,10 @@ function buildPublicHTML(event, participants, sponsors, sponsorItems, staff, gro
     ${event.notice ? `<div style="margin-top:16px"><label style="font-size:.8rem;color:#64748b;font-weight:600;display:block;margin-bottom:6px">안내사항</label><div class="notice-box">${safe(event.notice)}</div></div>` : ''}
   </div>
 
-  <div class="card">
-    <h2>👥 참가자 목록 (총 ${participants.length}명)</h2>
-    <div style="overflow-x:auto">
-      <table>
-        <thead><tr><th>#</th><th>이름</th><th>급수</th><th>나이</th><th>경력</th><th>성별</th><th>소속</th><th>비고</th></tr></thead>
-        <tbody>${participantRows}</tbody>
-      </table>
-    </div>
-  </div>
-
-  <div class="card">
-    <h2>🤝 찬조자 목록 (총 ${sponsors.length}명)</h2>
-    <div style="overflow-x:auto">
-      <table>
-        <thead><tr><th>#</th><th>찬조자명</th><th>소속</th><th>찬조구분</th><th>연락처</th><th>메모</th></tr></thead>
-        <tbody>${sponsorRows}</tbody>
-      </table>
-    </div>
-  </div>
-
-  <div class="card">
-    <h2>🎁 찬조물품 목록 (총 ${sponsorItems.length}건)</h2>
-    <div style="overflow-x:auto">
-      <table>
-        <thead><tr><th>#</th><th>물품명</th><th>수량</th><th>금액</th><th>찬조자</th><th>사용처</th><th>비고</th></tr></thead>
-        <tbody>${sponsorItemRows}</tbody>
-      </table>
-    </div>
-    ${totalAmount > 0 ? `<div class="summary"><div class="summary-item"><div class="num">${totalAmount.toLocaleString()}원</div><div class="lbl">총 찬조금액</div></div><div class="summary-item"><div class="num">${sponsorItems.length}건</div><div class="lbl">총 물품 수</div></div></div>` : ''}
-  </div>
-
-  <div class="card">
-    <h2>🛠 운영진 목록 (총 ${staff.length}명)</h2>
-    <div style="overflow-x:auto">
-      <table>
-        <thead><tr><th>#</th><th>이름</th><th>역할</th><th>연락처</th><th>담당업무</th><th>비고</th></tr></thead>
-        <tbody>${staffRows}</tbody>
-      </table>
-    </div>
-  </div>
+  ${participantsSection}
+  ${sponsorsSection}
+  ${sponsorItemsSection}
+  ${staffSection}
 
   ${groupingHTML ? `
   <div class="card">

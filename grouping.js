@@ -24,6 +24,56 @@ function grpSportParticipants() {
   return App.participants.filter(p => !p.attendType || p.attendType !== '회식');
 }
 
+async function grpClearResults() {
+  if (!confirm('조편성 결과를 초기화하시겠습니까?')) return;
+  GRP.results = null;
+  GRP.roundSwaps = {};
+  GRP.roundEditMode = null;
+  try {
+    await updateEvent(App.eventId, { groupingData: '' });
+    const idx = App.events.findIndex(e => e.id === App.eventId);
+    if (idx !== -1) App.events[idx].groupingData = '';
+  } catch (e) {
+    showToast('초기화 저장 실패: ' + e.message, 'error');
+  }
+  renderGroupingTab();
+  showToast('조편성이 초기화되었습니다.', 'success');
+}
+
+async function saveGroupingData() {
+  if (!App.eventId || !GRP.results) return;
+  const data = JSON.stringify({
+    results:     GRP.results,
+    doublesType: GRP.doublesType,
+    groupSize:   GRP.groupSize,
+    groupMode:   GRP.groupMode,
+    teamMode:    GRP.teamMode,
+    roundSwaps:  GRP.roundSwaps,
+  });
+  try {
+    await updateEvent(App.eventId, { groupingData: data });
+    const idx = App.events.findIndex(e => e.id === App.eventId);
+    if (idx !== -1) App.events[idx].groupingData = data;
+  } catch (e) {
+    showToast('조편성 저장 실패: ' + e.message, 'error');
+  }
+}
+
+function loadGroupingData() {
+  const ev = App.events.find(e => e.id === App.eventId);
+  if (!ev?.groupingData) return;
+  if (ev.groupingData === '') return;
+  try {
+    const data = JSON.parse(ev.groupingData);
+    GRP.results     = data.results     ?? null;
+    GRP.doublesType = data.doublesType ?? GRP.doublesType;
+    GRP.groupSize   = data.groupSize   ?? GRP.groupSize;
+    GRP.groupMode   = data.groupMode   ?? GRP.groupMode;
+    GRP.teamMode    = data.teamMode    ?? GRP.teamMode;
+    GRP.roundSwaps  = data.roundSwaps  ?? {};
+  } catch (_) {}
+}
+
 function grpScore(p) {
   const g = String(p.grade || '').trim();
   return GRADE_SCORES_G[g] || GRADE_SCORES_G[g.toUpperCase()] || 1;
@@ -43,6 +93,8 @@ function renderGroupingTab() {
     GRP.roundEditMode = null;
   }
   GRP._eventId = App.eventId;
+
+  if (!GRP.results) loadGroupingData();
 
   const panel = document.getElementById('panel-grouping');
   if (!panel) return;
@@ -120,9 +172,12 @@ function renderGroupingTab() {
 
       <div id="grp-info-box" class="hidden" style="border-radius:8px;padding:10px 14px;font-size:.85rem;margin-bottom:12px"></div>
 
-      <button class="btn btn-primary" style="width:100%;padding:12px" onclick="grpGenerate()">
-        🎯 조편성 생성
-      </button>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-primary" style="flex:1;padding:12px" onclick="grpGenerate()">
+          🎯 조편성 생성
+        </button>
+        ${GRP.results ? `<button class="btn btn-danger" style="padding:12px 16px" onclick="grpClearResults()">🗑 초기화</button>` : ''}
+      </div>
     </div>
 
     <div id="grp-results-area"></div>
@@ -199,6 +254,7 @@ function grpGenerate() {
   grpRenderResults();
   document.getElementById('grp-results-area')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   showToast('조편성이 완료되었습니다.', 'success');
+  saveGroupingData();
 }
 
 function grpBuildSection(type, pool) {
@@ -674,6 +730,7 @@ function grpSwapBye(groupIdx, roundIdx, matchIdx, playerSlot, inTeam1) {
   if (!team || playerSlot >= team.length) return;
   const out = team[playerSlot]; team[playerSlot] = cur.soloBye; cur.soloBye = out;
   GRP.roundSwaps[key] = cur; GRP.roundEditMode = null; grpRenderResults();
+  saveGroupingData();
 }
 
 // =====================================================
@@ -731,6 +788,7 @@ function grpMoveMember(srcIdx, memberId, tgtIdx) {
   grpRegenerateAt(srcIdx);
   grpRegenerateAt(tgtIdx);
   showToast(`${member.name} → ${tgt.name} 이동`, 'success');
+  saveGroupingData();
 }
 
 // ---- Move Modal (모바일) ----
@@ -821,6 +879,7 @@ function grpSubmitAdd() {
   grpRegenerateAt(GRP.groupAddTargetIdx);
   closeModal('grp-modal-add');
   showToast(`${toAdd.map(p => p.name).join(', ')} 추가됨`, 'success');
+  saveGroupingData();
 }
 
 // =====================================================
