@@ -1,0 +1,366 @@
+너는 프론트엔드 개발자다.
+현재 프로젝트는 순수 HTML/CSS/JavaScript 기반이며, GitHub Pages에서 배포될 정적 웹앱이다.
+백엔드 서버는 사용하지 않고 Firebase Firestore를 DB로 사용한다.
+
+중요:
+- GitHub Pages + Firebase 구조로 동작해야 한다.
+- Node 서버/API 서버를 만들지 않는다.
+- Firebase config 값은 사용자가 직접 발급해서 입력할 예정이므로, 코드에는 firebaseConfig를 쉽게 교체할 수 있는 위치를 만들어둔다.
+- Firebase API Key는 공개되어도 되는 설정값이지만, Firestore 보안 규칙으로 보호해야 하므로 보안 규칙 예시도 주석 또는 문서로 남긴다.
+- 기존 app.js / index.html 구조를 최대한 유지하면서 확장한다.
+- 기존 참가자 입력 기능은 이미 있으므로 삭제하지 말고 재사용/확장한다.
+- 기존에는 localStorage 기반이지만, Firebase 저장/불러오기 기능을 추가한다.
+- 오프라인 또는 Firebase 미설정 상태에서는 localStorage로도 임시 동작 가능하게 한다.
+
+참고할 기존 기능:
+- 참가자 직접 입력
+- 참가자 CSV/TXT/Excel 업로드
+- 참가자 텍스트 붙여넣기
+- 참가자 목록 표시/수정/삭제
+- SheetJS를 이용한 Excel 파싱
+- 브라우저에서 바로 실행되는 구조
+
+만들 기능:
+“이벤트 관리 시스템”을 만든다.
+
+예시 이벤트:
+- 배드민턴 교류전
+- 동호회 대회
+- 친선 경기
+- 워크샵 행사
+
+1. 이벤트 기본정보
+이벤트 생성/수정 화면을 만든다.
+
+필드:
+- 이벤트 제목
+- 이벤트 내용
+- 이벤트 목적
+- 이벤트 일자
+- 장소
+- 주최/주관
+- 안내사항
+- 생성일
+- 수정일
+
+2. 이벤트 목록
+Firebase Firestore에 저장된 이벤트 목록을 보여준다.
+
+기능:
+- 새 이벤트 만들기
+- 이벤트 수정
+- 이벤트 삭제
+- 이벤트 상세 관리로 이동
+- 이벤트 복사 가능하면 추가
+- 최근 수정일 기준 정렬
+
+3. 이벤트 상세 관리 화면
+이벤트 하나를 선택하면 상세 관리 화면으로 이동한다.
+
+상세 화면은 탭 구조로 구성한다.
+
+탭:
+- 기본정보
+- 참가자 리스트
+- 찬조자 리스트
+- 찬조물품 목록
+- 운영진 리스트
+- 공개 상세페이지 미리보기
+
+4. 참가자 리스트
+기존 참가자 기능을 이벤트 단위로 연결한다.
+
+참가자 필드:
+- 이름
+- 급수
+- 나이
+- 경력
+- 성별
+- 소속
+- 연락처
+- 비고
+
+입력 방식:
+- 직접 추가
+- 텍스트 붙여넣기
+- CSV/TXT 업로드
+- Excel 업로드
+
+기존 코드의 참가자 파싱 로직을 최대한 재사용한다.
+단, 저장 위치는 전체 localStorage 하나가 아니라 특정 이벤트의 participants 컬렉션 또는 participants 배열로 관리한다.
+
+Firestore 권장 구조:
+events/{eventId}
+events/{eventId}/participants/{participantId}
+
+5. 찬조자 리스트
+찬조자 탭을 만든다.
+
+찬조자 필드:
+- 찬조자명
+- 연락처
+- 소속
+- 찬조 구분
+- 메모
+
+기능:
+- 직접 추가
+- 수정
+- 삭제
+- 목록 표시
+- 검색 가능하면 추가
+
+Firestore 권장 구조:
+events/{eventId}/sponsors/{sponsorId}
+
+6. 찬조물품 목록
+찬조물품 탭을 만든다.
+
+물품 필드:
+- 물품명
+- 수량
+- 금액 또는 예상가
+- 찬조자명
+- 찬조자 ID
+- 사용처
+- 비고
+
+중요:
+- 각 물품 옆에 찬조자명이 반드시 보이게 한다.
+- 찬조자 리스트에서 선택할 수 있게 한다.
+- 직접 찬조자명 입력도 가능하게 한다.
+
+Firestore 권장 구조:
+events/{eventId}/sponsorItems/{itemId}
+
+7. 운영진 리스트
+운영진 탭을 만든다.
+
+운영진 필드:
+- 이름
+- 역할
+- 연락처
+- 담당업무
+- 비고
+
+예시 역할:
+- 총괄
+- 진행
+- 경기 운영
+- 접수
+- 회계
+- 촬영
+- 안내
+
+Firestore 권장 구조:
+events/{eventId}/staff/{staffId}
+
+8. 공개 상세페이지 / 내보내기
+이벤트 상세 관리에서 “내보내기” 또는 “공개 상세페이지 생성” 기능을 만든다.
+
+목표:
+생성된 이벤트 정보를 사람들에게 공유할 수 있는 깔끔한 상세페이지 형태로 보여준다.
+
+상세페이지 포함 내용:
+- 이벤트 제목
+- 이벤트 내용
+- 이벤트 목적
+- 일자
+- 장소
+- 안내사항
+- 참가자 리스트
+- 찬조자 리스트
+- 찬조물품 목록
+- 운영진 리스트
+
+디자인:
+- 모바일에서도 보기 좋게
+- 카드형 레이아웃
+- 탭 또는 섹션 방식
+- 인쇄 가능하도록 깔끔하게
+- 공유용 HTML로 보기 좋게
+
+기능:
+- 상세페이지 미리보기
+- HTML 파일로 다운로드
+- JSON 백업 다운로드
+- CSV 다운로드 가능하면 추가
+- 인쇄 버튼 추가
+
+9. Firebase 연동
+Firebase SDK를 사용한다.
+
+필요 기능:
+- Firestore 초기화
+- 이벤트 CRUD
+- 참가자 CRUD
+- 찬조자 CRUD
+- 찬조물품 CRUD
+- 운영진 CRUD
+- 실시간 구독 또는 수동 새로고침 중 하나 선택
+
+구조 예시:
+firebase-config.js
+firebase-service.js
+app.js
+index.html
+style.css
+
+firebase-config.js:
+- firebaseConfig를 한 곳에서 관리
+- 사용자가 Firebase 콘솔에서 발급받은 값을 붙여넣기 쉽게 작성
+
+firebase-service.js:
+- Firestore 관련 함수만 분리
+- createEvent
+- updateEvent
+- deleteEvent
+- getEvents
+- getEvent
+- addParticipant
+- updateParticipant
+- deleteParticipant
+- addSponsor
+- updateSponsor
+- deleteSponsor
+- addSponsorItem
+- updateSponsorItem
+- deleteSponsorItem
+- addStaff
+- updateStaff
+- deleteStaff
+
+10. GitHub Pages 배포 기준
+정적 파일만으로 실행되어야 한다.
+
+금지:
+- Express 서버 생성 금지
+- Node API 생성 금지
+- 환경변수 의존 금지
+- 서버 사이드 렌더링 금지
+
+허용:
+- HTML
+- CSS
+- JavaScript
+- Firebase CDN SDK
+- SheetJS CDN
+- localStorage fallback
+
+11. UI 요구사항
+기존 Tailwind CDN 스타일을 유지한다.
+기존 디자인 톤을 유지하면서 이벤트 관리용으로 확장한다.
+
+화면 구조:
+- 상단 헤더
+- 이벤트 목록 화면
+- 이벤트 생성/수정 모달 또는 섹션
+- 이벤트 상세 관리 화면
+- 탭 메뉴
+- 각 탭별 목록 테이블
+- 추가/수정 폼
+- 미리보기/내보내기 버튼
+
+12. 데이터 저장 구조 예시
+
+events/{eventId}
+{
+  title: "배드민턴 교류전",
+  content: "동호회 간 친선 교류전",
+  purpose: "회원 간 친목 및 실력 향상",
+  eventDate: "2026-05-10",
+  location: "부산 체육관",
+  organizer: "OO 배드민턴 클럽",
+  notice: "운동화 필수, 10분 전 도착",
+  createdAt: timestamp,
+  updatedAt: timestamp
+}
+
+events/{eventId}/participants/{participantId}
+{
+  name: "홍길동",
+  grade: "B",
+  age: 35,
+  career: 3,
+  gender: "남",
+  affiliation: "부산클럽",
+  phone: "",
+  memo: "",
+  score: 4,
+  createdAt: timestamp
+}
+
+events/{eventId}/sponsors/{sponsorId}
+{
+  name: "김찬조",
+  phone: "010-0000-0000",
+  affiliation: "부산클럽",
+  type: "물품",
+  memo: "",
+  createdAt: timestamp
+}
+
+events/{eventId}/sponsorItems/{itemId}
+{
+  itemName: "셔틀콕",
+  quantity: 10,
+  amount: 50000,
+  sponsorId: "sponsorId",
+  sponsorName: "김찬조",
+  usage: "경기 운영",
+  memo: "",
+  createdAt: timestamp
+}
+
+events/{eventId}/staff/{staffId}
+{
+  name: "이운영",
+  role: "총괄",
+  phone: "010-0000-0000",
+  task: "전체 진행 관리",
+  memo: "",
+  createdAt: timestamp
+}
+
+13. 추가 요구사항
+- 삭제 시 confirm 처리
+- 입력값 검증
+- 저장 성공/실패 toast 표시
+- Firebase 미설정 시 안내 메시지 표시
+- 데이터가 없을 때 빈 상태 UI 표시
+- 모바일 반응형 필수
+- 기존 참가자 파싱 기능은 최대한 유지
+- 기존 코드가 너무 길면 기능별 파일로 분리
+- 함수명은 이해하기 쉽게 작성
+- 주석을 적절히 추가
+
+14. 최종 결과물
+아래 파일들을 생성 또는 수정해줘.
+
+필수:
+- index.html
+- app.js
+- style.css
+
+가능하면 분리:
+- firebase-config.js
+- firebase-service.js
+- export.js
+
+15. Firebase 보안 규칙 예시도 README 또는 주석으로 작성해줘.
+일단 테스트용 규칙과 로그인 적용 시 규칙을 구분해서 작성해줘.
+
+테스트용 예시:
+- 개발 중에만 사용
+- 실서비스 사용 금지
+
+로그인 적용 시 예시:
+- 로그인 사용자만 읽기/쓰기 가능
+
+16. 내가 직접 해야 하는 작업도 마지막에 정리해줘.
+- Firebase 프로젝트 생성
+- 웹앱 추가
+- firebaseConfig 복사
+- Firestore Database 생성
+- 보안 규칙 설정
+- GitHub Pages 배포

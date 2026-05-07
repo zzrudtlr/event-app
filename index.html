@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>이벤트 관리 시스템</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Firebase SDK (Compat mode — firebase-config.js 사용) -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+
+  <!-- SheetJS (Excel 파싱) -->
+  <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
+
+  <!-- Custom Styles -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ============================================================
+     헤더
+     ============================================================ -->
+<header class="app-header">
+  <div style="min-width:110px">
+    <button id="header-back" class="header-back-btn hidden" onclick="goBack()">← 목록으로</button>
+  </div>
+  <h1 id="header-title">이벤트 관리</h1>
+  <div id="header-user" style="min-width:110px;display:flex;align-items:center;justify-content:flex-end;gap:8px">
+    <span id="header-user-email" style="font-size:.72rem;color:rgba(255,255,255,0.8);max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+    <button id="btn-logout" class="header-back-btn hidden" onclick="handleLogout()">로그아웃</button>
+  </div>
+</header>
+
+<!-- ============================================================
+     Firebase 상태 배너
+     ============================================================ -->
+<div id="firebase-banner" class="firebase-banner">
+  ⏳ 초기화 중...
+</div>
+
+<!-- Firebase 설정 안내 (접기/펼치기) -->
+<div id="firebase-guide" class="hidden" style="background:#fffbeb;border-bottom:1px solid #fde68a;padding:16px 20px;font-size:.875rem;color:#78350f">
+  <strong>🔧 Firebase 설정 방법</strong>
+  <ol style="margin:8px 0 0 20px;line-height:2">
+    <li><a href="https://console.firebase.google.com" target="_blank" rel="noopener" style="color:#1d4ed8;text-decoration:underline">Firebase 콘솔</a>에서 새 프로젝트를 만드세요.</li>
+    <li>프로젝트 설정(⚙️) → 내 앱 → 웹 앱 추가 → <code>firebaseConfig</code> 값을 복사하세요.</li>
+    <li><code>firebase-config.js</code>의 <code>YOUR_*</code> 부분을 실제 값으로 교체하세요.</li>
+    <li>Firestore Database를 생성하고 아래 보안 규칙을 적용하세요.</li>
+    <li>페이지를 새로고침하면 자동으로 연결됩니다.</li>
+  </ol>
+  <div style="margin-top:12px;background:#fef3c7;border-radius:6px;padding:10px 14px">
+    <strong>Firestore 보안 규칙 — 테스트용 (개발 중에만 사용, 실서비스 절대 금지)</strong>
+    <pre style="margin-top:6px;font-size:.8rem;background:white;padding:8px;border-radius:4px;overflow-x:auto">rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}</pre>
+    <strong style="display:block;margin-top:10px">로그인 사용자만 허용 (실서비스 권장)</strong>
+    <pre style="margin-top:6px;font-size:.8rem;background:white;padding:8px;border-radius:4px;overflow-x:auto">rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /events/{eventId} {
+      allow read, write: if request.auth != null;
+      match /participants/{id} { allow read, write: if request.auth != null; }
+      match /sponsors/{id}     { allow read, write: if request.auth != null; }
+      match /sponsorItems/{id} { allow read, write: if request.auth != null; }
+      match /staff/{id}        { allow read, write: if request.auth != null; }
+    }
+  }
+}</pre>
+  </div>
+</div>
+
+<!-- ============================================================
+     뷰: 로그인 / 회원가입
+     ============================================================ -->
+<div id="view-auth" class="hidden">
+  <div style="min-height:calc(100vh - 56px);display:flex;align-items:center;justify-content:center;padding:20px">
+    <div style="background:white;border-radius:16px;padding:32px 28px;width:100%;max-width:400px;box-shadow:0 4px 20px rgba(0,0,0,0.1)">
+
+      <div style="text-align:center;margin-bottom:28px">
+        <div style="font-size:2.5rem;margin-bottom:8px">📅</div>
+        <h2 style="font-size:1.3rem;font-weight:700;color:#1e293b">이벤트 관리 시스템</h2>
+        <p style="font-size:.85rem;color:#64748b;margin-top:4px">로그인하여 내 이벤트를 관리하세요</p>
+      </div>
+
+      <div style="display:flex;background:#f1f5f9;border-radius:10px;padding:4px;margin-bottom:24px">
+        <button id="auth-tab-login"  class="auth-tab-btn active" onclick="switchAuthTab('login')">로그인</button>
+        <button id="auth-tab-signup" class="auth-tab-btn"        onclick="switchAuthTab('signup')">회원가입</button>
+      </div>
+
+      <!-- 로그인 폼 -->
+      <div id="auth-form-login">
+        <div class="form-group">
+          <label class="form-label" for="auth-login-email">이메일</label>
+          <input id="auth-login-email" class="form-input" type="email" placeholder="example@email.com" autocomplete="email">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="auth-login-pw">비밀번호</label>
+          <input id="auth-login-pw" class="form-input" type="password" placeholder="6자 이상" autocomplete="current-password"
+                 onkeydown="if(event.key==='Enter')handleLogin()">
+        </div>
+        <button id="btn-login" class="btn btn-primary" style="width:100%;justify-content:center;padding:11px;font-size:.95rem" onclick="handleLogin()">로그인</button>
+        <p id="auth-error-login" class="auth-error"></p>
+      </div>
+
+      <!-- 회원가입 폼 -->
+      <div id="auth-form-signup" class="hidden">
+        <div class="form-group">
+          <label class="form-label" for="auth-signup-email">이메일</label>
+          <input id="auth-signup-email" class="form-input" type="email" placeholder="example@email.com" autocomplete="email">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="auth-signup-pw">비밀번호</label>
+          <input id="auth-signup-pw" class="form-input" type="password" placeholder="6자 이상" autocomplete="new-password">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="auth-signup-pw2">비밀번호 확인</label>
+          <input id="auth-signup-pw2" class="form-input" type="password" placeholder="비밀번호 재입력" autocomplete="new-password"
+                 onkeydown="if(event.key==='Enter')handleSignup()">
+        </div>
+        <button id="btn-signup" class="btn btn-primary" style="width:100%;justify-content:center;padding:11px;font-size:.95rem" onclick="handleSignup()">회원가입</button>
+        <p id="auth-error-signup" class="auth-error"></p>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     뷰: 이벤트 목록
+     ============================================================ -->
+<div id="view-list" class="hidden">
+  <div style="max-width:900px;margin:0 auto;padding:20px 16px">
+
+    <!-- 상단 타이틀 + 새 이벤트 버튼 -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px">
+      <div>
+        <h2 style="font-size:1.25rem;font-weight:700;color:#1e293b">내 이벤트</h2>
+        <p style="font-size:.85rem;color:#64748b;margin-top:2px">이벤트를 선택하거나 새로 만드세요.</p>
+      </div>
+      <button class="btn btn-primary" onclick="openEventModal()">＋ 새 이벤트 만들기</button>
+    </div>
+
+    <!-- 이벤트 카드 목록 -->
+    <div id="event-list-container">
+      <div class="empty-state"><div class="icon">⏳</div><p>로딩 중...</p></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ============================================================
+     뷰: 이벤트 상세
+     ============================================================ -->
+<div id="view-detail" class="hidden">
+
+  <!-- 탭 바 (헤더 아래 sticky) -->
+  <div style="position:sticky;top:56px;z-index:30;background:#f1f5f9;padding:8px 16px;border-bottom:1px solid #e2e8f0">
+    <div class="tab-bar">
+      <button class="tab-btn" data-tab="info"         onclick="switchTab('info')">📋 기본정보</button>
+      <button class="tab-btn" data-tab="participants" onclick="switchTab('participants')">👥 참가자</button>
+      <button class="tab-btn" data-tab="sponsors"     onclick="switchTab('sponsors')">🤝 찬조</button>
+      <button class="tab-btn" data-tab="staff"        onclick="switchTab('staff')">🛠 운영진</button>
+      <button class="tab-btn" data-tab="grouping"    onclick="switchTab('grouping')">🏟 조편성</button>
+      <button class="tab-btn" data-tab="preview"      onclick="switchTab('preview')">🌐 미리보기</button>
+    </div>
+  </div>
+
+  <!-- 탭 패널 -->
+  <div style="max-width:900px;margin:0 auto;padding:16px">
+    <div id="panel-info"         class="tab-panel"        data-tab="info"></div>
+    <div id="panel-participants" class="tab-panel hidden"  data-tab="participants"></div>
+    <div id="panel-sponsors"     class="tab-panel hidden"  data-tab="sponsors"></div>
+    <div id="panel-staff"        class="tab-panel hidden"  data-tab="staff"></div>
+    <div id="panel-preview"      class="tab-panel hidden"  data-tab="preview"></div>
+    <div id="panel-grouping"     class="tab-panel hidden"  data-tab="grouping"></div>
+  </div>
+
+</div>
+
+<!-- ============================================================
+     모달: 이벤트 생성 / 수정
+     ============================================================ -->
+<div id="modal-event" class="modal-overlay" role="dialog" aria-modal="true">
+  <div class="modal-box">
+    <h2 id="event-modal-title" class="modal-title">새 이벤트 만들기</h2>
+
+    <div class="form-group">
+      <label class="form-label" for="event-title">이벤트 제목 <span class="required">*</span></label>
+      <input id="event-title" class="form-input" type="text" placeholder="예: 배드민턴 교류전" maxlength="100">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="event-content">이벤트 내용</label>
+      <textarea id="event-content" class="form-textarea" placeholder="이벤트에 대한 상세 내용을 입력하세요" rows="3"></textarea>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="event-purpose">이벤트 목적</label>
+      <input id="event-purpose" class="form-input" type="text" placeholder="예: 회원 간 친목 및 실력 향상">
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label" for="event-date">이벤트 일자</label>
+        <input id="event-date" class="form-input" type="date">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="event-location">장소</label>
+        <input id="event-location" class="form-input" type="text" placeholder="예: 부산 체육관">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="event-organizer">주최 / 주관</label>
+      <input id="event-organizer" class="form-input" type="text" placeholder="예: OO 배드민턴 클럽">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="event-notice">안내사항</label>
+      <textarea id="event-notice" class="form-textarea" placeholder="참가자에게 전달할 안내사항 (운동화 필수, 10분 전 도착 등)" rows="3"></textarea>
+    </div>
+
+    <div class="form-group" style="border-top:1px solid #e2e8f0;padding-top:16px;margin-top:4px">
+      <label class="form-label">참석 신청 옵션 <span style="font-weight:400;color:#64748b">(체크한 항목만 신청 페이지에 표시)</span></label>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:8px">
+        <label class="attend-opt-label"><input type="checkbox" id="opt-exercise"  value="운동"> 운동</label>
+        <label class="attend-opt-label"><input type="checkbox" id="opt-both"      value="운동+회식"> 운동+회식</label>
+        <label class="attend-opt-label"><input type="checkbox" id="opt-dinner"    value="회식"> 회식</label>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+      <button class="btn btn-secondary" onclick="closeModal('modal-event')">취소</button>
+      <button id="btn-save-event" class="btn btn-primary" onclick="handleSaveEvent()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     모달: 참가자 추가 / 수정
+     ============================================================ -->
+<div id="modal-participant" class="modal-overlay" role="dialog" aria-modal="true">
+  <div class="modal-box">
+    <h2 id="participant-modal-title" class="modal-title">참가자 추가</h2>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label" for="p-name">이름 <span class="required">*</span></label>
+        <input id="p-name" class="form-input" type="text" placeholder="홍길동">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="p-gender">성별</label>
+        <select id="p-gender" class="form-select">
+          <option value="">선택</option>
+          <option value="남">남</option>
+          <option value="여">여</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label" for="p-grade">급수</label>
+        <input id="p-grade" class="form-input" type="text" placeholder="예: A, B, C">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="p-age">나이</label>
+        <input id="p-age" class="form-input" type="number" placeholder="35" min="1" max="120">
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label" for="p-career">경력 (년)</label>
+        <input id="p-career" class="form-input" type="number" placeholder="3" min="0">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="p-affiliation">소속</label>
+        <input id="p-affiliation" class="form-input" type="text" placeholder="예: 부산클럽">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="p-phone">연락처</label>
+      <input id="p-phone" class="form-input" type="tel" placeholder="010-0000-0000">
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label" for="p-attend-type">참석 구분</label>
+        <select id="p-attend-type" class="form-select">
+          <option value="">선택 안 함</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="p-memo">비고</label>
+        <input id="p-memo" class="form-input" type="text" placeholder="기타 메모">
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:4px">
+      <button class="btn btn-secondary" onclick="closeModal('modal-participant')">취소</button>
+      <button id="btn-save-participant" class="btn btn-primary" onclick="handleSaveParticipant()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     모달: 텍스트 붙여넣기로 참가자 일괄 추가
+     ============================================================ -->
+<div id="modal-paste" class="modal-overlay" role="dialog" aria-modal="true">
+  <div class="modal-box">
+    <h2 class="modal-title">📋 텍스트 붙여넣기로 참가자 추가</h2>
+
+    <div style="background:#eff6ff;border-radius:8px;padding:12px 14px;font-size:.85rem;color:#1e40af;margin-bottom:14px">
+      <strong>입력 형식 안내</strong>
+      <p style="margin-top:4px;color:#374151">한 줄에 한 명씩. 탭·쉼표·파이프(|)로 구분합니다.</p>
+      <pre style="margin-top:8px;background:white;padding:8px;border-radius:4px;font-size:.8rem;color:#374151;overflow-x:auto">이름, 급수, 나이, 경력, 성별, 소속, 연락처, 비고
+홍길동, A, 35, 3, 남, 부산클럽, 010-1234-5678, 메모
+김철수, B, 28, 1, 남, 서울클럽</pre>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="paste-text">참가자 정보 붙여넣기</label>
+      <textarea id="paste-text" class="form-textarea"
+        style="min-height:200px;font-family:monospace;font-size:.85rem"
+        placeholder="이름, 급수, 나이, 경력, 성별, 소속, 연락처, 비고&#10;홍길동, A, 35, 3, 남, 부산클럽"></textarea>
+    </div>
+
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:4px">
+      <button class="btn btn-secondary" onclick="closeModal('modal-paste')">취소</button>
+      <button id="btn-paste-import" class="btn btn-primary" onclick="handlePasteImport()">가져오기</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     모달: 찬조자 추가 / 수정
+     ============================================================ -->
+<div id="modal-sponsor" class="modal-overlay" role="dialog" aria-modal="true">
+  <div class="modal-box">
+    <h2 id="sponsor-modal-title" class="modal-title">찬조자 추가</h2>
+
+    <div class="form-group">
+      <label class="form-label" for="s-name">찬조자명 <span class="required">*</span></label>
+      <input id="s-name" class="form-input" type="text" placeholder="홍길동">
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label" for="s-phone">연락처</label>
+        <input id="s-phone" class="form-input" type="tel" placeholder="010-0000-0000">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="s-affiliation">소속</label>
+        <input id="s-affiliation" class="form-input" type="text" placeholder="소속 클럽 또는 단체">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="s-type">찬조 구분</label>
+      <select id="s-type" class="form-select">
+        <option value="물품">물품</option>
+        <option value="현금">현금</option>
+        <option value="상품권">상품권</option>
+        <option value="식품">식품</option>
+        <option value="기타">기타</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="s-memo">메모</label>
+      <textarea id="s-memo" class="form-textarea" placeholder="기타 메모" rows="2"></textarea>
+    </div>
+
+    <div style="border-top:1px solid #e2e8f0;margin-top:4px;padding-top:16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <span class="form-label" style="margin:0">찬조물품</span>
+        <button type="button" class="btn btn-outline btn-sm" onclick="sponsorAddItemRow()">+ 물품 추가</button>
+      </div>
+      <div id="s-items-list"></div>
+    </div>
+
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+      <button class="btn btn-secondary" onclick="closeModal('modal-sponsor')">취소</button>
+      <button id="btn-save-sponsor" class="btn btn-primary" onclick="handleSaveSponsor()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     모달: 찬조물품 추가 / 수정
+     ============================================================ -->
+<div id="modal-sponsor-item" class="modal-overlay" role="dialog" aria-modal="true">
+  <div class="modal-box">
+    <h2 id="si-modal-title" class="modal-title">찬조물품 추가</h2>
+
+    <div class="form-group">
+      <label class="form-label" for="si-name">물품명 <span class="required">*</span></label>
+      <input id="si-name" class="form-input" type="text" placeholder="예: 셔틀콕">
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label" for="si-quantity">수량</label>
+        <input id="si-quantity" class="form-input" type="number" placeholder="10" min="0">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="si-amount">금액 (원)</label>
+        <input id="si-amount" class="form-input" type="number" placeholder="50000" min="0">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="si-sponsor-select">찬조자 선택</label>
+      <select id="si-sponsor-select" class="form-select">
+        <option value="">직접 입력</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="si-sponsor-name">찬조자명</label>
+      <input id="si-sponsor-name" class="form-input" type="text" placeholder="찬조자명 직접 입력 또는 위에서 선택">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="si-usage">사용처</label>
+      <input id="si-usage" class="form-input" type="text" placeholder="예: 경기 운영">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="si-memo">비고</label>
+      <input id="si-memo" class="form-input" type="text" placeholder="기타 메모">
+    </div>
+
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:4px">
+      <button class="btn btn-secondary" onclick="closeModal('modal-sponsor-item')">취소</button>
+      <button id="btn-save-si" class="btn btn-primary" onclick="handleSaveSponsorItem()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     모달: 운영진 추가 / 수정
+     ============================================================ -->
+<div id="modal-staff" class="modal-overlay" role="dialog" aria-modal="true">
+  <div class="modal-box">
+    <h2 id="st-modal-title" class="modal-title">운영진 추가</h2>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label" for="st-name">이름 <span class="required">*</span></label>
+        <input id="st-name" class="form-input" type="text" placeholder="홍길동">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="st-role">역할</label>
+        <select id="st-role" class="form-select">
+          <option value="총괄">총괄</option>
+          <option value="진행">진행</option>
+          <option value="경기 운영">경기 운영</option>
+          <option value="접수">접수</option>
+          <option value="회계">회계</option>
+          <option value="촬영">촬영</option>
+          <option value="안내">안내</option>
+          <option value="기타">기타</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="st-phone">연락처</label>
+      <input id="st-phone" class="form-input" type="tel" placeholder="010-0000-0000">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="st-task">담당업무</label>
+      <input id="st-task" class="form-input" type="text" placeholder="예: 전체 진행 관리">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="st-memo">비고</label>
+      <input id="st-memo" class="form-input" type="text" placeholder="기타 메모">
+    </div>
+
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:4px">
+      <button class="btn btn-secondary" onclick="closeModal('modal-staff')">취소</button>
+      <button id="btn-save-staff" class="btn btn-primary" onclick="handleSaveStaff()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     Toast 알림 컨테이너
+     ============================================================ -->
+<div id="toast-container" class="toast-container"></div>
+
+<!-- ============================================================
+     모달: 조편성 — 조원 추가
+     ============================================================ -->
+<div id="grp-modal-add" class="modal-overlay" role="dialog" aria-modal="true">
+  <div class="modal-box" style="max-width:440px">
+    <h2 id="grp-add-title" class="modal-title">조원 추가</h2>
+    <input id="grp-add-search" class="form-input" type="text" placeholder="이름 검색..."
+           oninput="grpRenderAddList()" style="margin-bottom:10px">
+    <div id="grp-add-list"  style="max-height:320px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:8px"></div>
+    <p  id="grp-add-empty" class="hidden" style="text-align:center;color:#94a3b8;padding:20px;font-size:.875rem">해당하는 참가자가 없습니다.</p>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+      <button class="btn btn-secondary" onclick="closeModal('grp-modal-add')">취소</button>
+      <button class="btn btn-primary"   onclick="grpSubmitAdd()">추가</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     모달: 조편성 — 조 이동 (모바일 롱프레스)
+     ============================================================ -->
+<div id="grp-modal-move" class="modal-overlay" role="dialog" aria-modal="true">
+  <div class="modal-box" style="max-width:360px">
+    <h2 id="grp-move-title" class="modal-title">조 이동</h2>
+    <div id="grp-move-list" style="display:flex;flex-direction:column;gap:6px;max-height:400px;overflow-y:auto"></div>
+    <div style="display:flex;justify-content:flex-end;margin-top:14px">
+      <button class="btn btn-secondary" onclick="closeModal('grp-modal-move')">취소</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     뷰: 참석 신청 공개 페이지 (?attend=EVENTID)
+     ============================================================ -->
+<div id="view-attend" class="hidden">
+  <div style="background:linear-gradient(135deg,#1d4ed8,#3b82f6);color:white;padding:24px 20px;text-align:center">
+    <div style="font-size:2rem;margin-bottom:8px">📅</div>
+    <h1 id="attend-event-title" style="font-size:1.25rem;font-weight:700"></h1>
+    <p id="attend-event-meta" style="font-size:.85rem;opacity:.85;margin-top:6px"></p>
+  </div>
+  <div style="max-width:480px;margin:0 auto;padding:24px 16px">
+    <div id="attend-form-wrap" style="background:white;border-radius:16px;padding:28px 22px;box-shadow:0 2px 16px rgba(0,0,0,.09)">
+      <div class="empty-state"><div class="icon">⏳</div><p>로딩 중...</p></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     Scripts (순서 중요: Firebase SDK → config → service → export → app → grouping)
+     ============================================================ -->
+<script src="firebase-config.js"></script>
+<script src="firebase-service.js"></script>
+<script src="export.js"></script>
+<script src="app.js"></script>
+<script src="grouping.js"></script>
+
+</body>
+</html>
