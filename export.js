@@ -90,16 +90,14 @@ function buildPublicHTML(event, participants, sponsors, sponsorItems, staff, gro
           <td>${safe(p.age)}</td>
           <td>${safe(p.career)}</td>
           <td>${safe(p.gender)}</td>
-          <td>${safe(p.affiliation)}</td>
-          <td>${safe(p.memo)}</td>
         </tr>`).join('')
-      : `<tr><td colspan="8" class="empty">참가자 없음</td></tr>`;
+      : `<tr><td colspan="6" class="empty">참가자 없음</td></tr>`;
     return `
   <div class="card">
     <h2>👥 참가자 목록 (총 ${participants.length}명)</h2>
     <div style="overflow-x:auto">
       <table>
-        <thead><tr><th>#</th><th>이름</th><th>급수</th><th>나이</th><th>경력</th><th>성별</th><th>소속</th><th>비고</th></tr></thead>
+        <thead><tr><th>#</th><th>이름</th><th>급수</th><th>나이</th><th>경력</th><th>성별</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
     </div>
@@ -112,18 +110,16 @@ function buildPublicHTML(event, participants, sponsors, sponsorItems, staff, gro
         <tr>
           <td>${i + 1}</td>
           <td><strong>${safe(s.name)}</strong></td>
-          <td>${safe(s.affiliation)}</td>
           <td>${safe(s.type)}</td>
           <td>${safe(s.phone)}</td>
-          <td>${safe(s.memo)}</td>
         </tr>`).join('')
-      : `<tr><td colspan="6" class="empty">찬조자 없음</td></tr>`;
+      : `<tr><td colspan="4" class="empty">찬조자 없음</td></tr>`;
     return `
   <div class="card">
     <h2>🤝 찬조자 목록 (총 ${sponsors.length}명)</h2>
     <div style="overflow-x:auto">
       <table>
-        <thead><tr><th>#</th><th>찬조자명</th><th>소속</th><th>찬조구분</th><th>연락처</th><th>메모</th></tr></thead>
+        <thead><tr><th>#</th><th>찬조자명</th><th>찬조구분</th><th>연락처</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
     </div>
@@ -141,15 +137,14 @@ function buildPublicHTML(event, participants, sponsors, sponsorItems, staff, gro
           <td>${item.amount ? Number(item.amount).toLocaleString() + '원' : '-'}</td>
           <td>${safe(item.sponsorName)}</td>
           <td>${safe(item.usage)}</td>
-          <td>${safe(item.memo)}</td>
         </tr>`).join('')
-      : `<tr><td colspan="7" class="empty">찬조물품 없음</td></tr>`;
+      : `<tr><td colspan="6" class="empty">찬조물품 없음</td></tr>`;
     return `
   <div class="card">
     <h2>🎁 찬조물품 목록 (총 ${sponsorItems.length}건)</h2>
     <div style="overflow-x:auto">
       <table>
-        <thead><tr><th>#</th><th>물품명</th><th>수량</th><th>금액</th><th>찬조자</th><th>사용처</th><th>비고</th></tr></thead>
+        <thead><tr><th>#</th><th>물품명</th><th>수량</th><th>금액</th><th>찬조자</th><th>사용처</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
     </div>
@@ -166,15 +161,14 @@ function buildPublicHTML(event, participants, sponsors, sponsorItems, staff, gro
           <td>${safe(s.role)}</td>
           <td>${safe(s.phone)}</td>
           <td>${safe(s.task)}</td>
-          <td>${safe(s.memo)}</td>
         </tr>`).join('')
-      : `<tr><td colspan="6" class="empty">운영진 없음</td></tr>`;
+      : `<tr><td colspan="5" class="empty">운영진 없음</td></tr>`;
     return `
   <div class="card">
     <h2>🛠 운영진 목록 (총 ${staff.length}명)</h2>
     <div style="overflow-x:auto">
       <table>
-        <thead><tr><th>#</th><th>이름</th><th>역할</th><th>연락처</th><th>담당업무</th><th>비고</th></tr></thead>
+        <thead><tr><th>#</th><th>이름</th><th>역할</th><th>연락처</th><th>담당업무</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
     </div>
