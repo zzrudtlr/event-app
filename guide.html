@@ -1,0 +1,946 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>이벤트 관리 시스템 — 사용 설명서</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --blue:   #1d4ed8;
+      --blue-l: #eff6ff;
+      --amber:  #f59e0b;
+      --amber-l:#fef3c7;
+      --green:  #059669;
+      --green-l:#d1fae5;
+      --gray:   #64748b;
+      --border: #e2e8f0;
+      --bg:     #f8fafc;
+      --text:   #1e293b;
+    }
+
+    body {
+      font-family: 'Noto Sans KR', -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+    }
+
+    /* ---- 헤더 ---- */
+    .site-header {
+      background: linear-gradient(135deg, #1d4ed8, #3b82f6);
+      color: white;
+      padding: 40px 24px 36px;
+      text-align: center;
+    }
+    .site-header .icon { font-size: 2.8rem; margin-bottom: 10px; }
+    .site-header h1 { font-size: 1.6rem; font-weight: 700; letter-spacing: -.02em; }
+    .site-header p  { font-size: .95rem; opacity: .85; margin-top: 6px; }
+
+    /* ---- 레이아웃 ---- */
+    .layout {
+      display: grid;
+      grid-template-columns: 220px 1fr;
+      max-width: 1060px;
+      margin: 0 auto;
+      gap: 0;
+      align-items: start;
+    }
+
+    /* ---- 사이드바 ---- */
+    .sidebar {
+      position: sticky;
+      top: 0;
+      padding: 28px 0 28px 20px;
+      height: 100vh;
+      overflow-y: auto;
+    }
+    .sidebar-title {
+      font-size: .7rem;
+      font-weight: 700;
+      color: var(--gray);
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      margin-bottom: 10px;
+      padding-left: 4px;
+    }
+    .sidebar nav { display: flex; flex-direction: column; gap: 2px; }
+    .sidebar a {
+      display: block;
+      padding: 7px 10px;
+      border-radius: 7px;
+      font-size: .85rem;
+      color: var(--gray);
+      text-decoration: none;
+      transition: all .15s;
+    }
+    .sidebar a:hover { background: white; color: var(--blue); }
+    .sidebar a.active { background: var(--blue-l); color: var(--blue); font-weight: 600; }
+    .sidebar a .num {
+      display: inline-block;
+      width: 18px;
+      height: 18px;
+      background: var(--border);
+      border-radius: 50%;
+      font-size: .65rem;
+      font-weight: 700;
+      text-align: center;
+      line-height: 18px;
+      margin-right: 6px;
+      color: var(--gray);
+      flex-shrink: 0;
+    }
+
+    /* ---- 본문 ---- */
+    .content {
+      padding: 32px 28px 80px;
+      min-width: 0;
+    }
+
+    /* ---- 섹션 ---- */
+    .section {
+      background: white;
+      border-radius: 14px;
+      padding: 28px 28px;
+      margin-bottom: 24px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.06);
+      scroll-margin-top: 24px;
+    }
+    .section-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--blue-l);
+      color: var(--blue);
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: .75rem;
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+    .section h2 {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 6px;
+    }
+    .section .desc {
+      font-size: .9rem;
+      color: var(--gray);
+      margin-bottom: 20px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 16px;
+    }
+
+    /* ---- 기능 아이템 ---- */
+    .feature-list { display: flex; flex-direction: column; gap: 14px; }
+    .feature-item {
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+    }
+    .feature-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      background: var(--blue-l);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.1rem;
+      flex-shrink: 0;
+    }
+    .feature-body h3 {
+      font-size: .9rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 3px;
+    }
+    .feature-body p {
+      font-size: .83rem;
+      color: var(--gray);
+      line-height: 1.6;
+    }
+
+    /* ---- 스텝 ---- */
+    .steps { display: flex; flex-direction: column; gap: 12px; }
+    .step {
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+    }
+    .step-num {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: var(--blue);
+      color: white;
+      font-size: .75rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .step-body { font-size: .875rem; color: var(--text); }
+    .step-body strong { color: var(--blue); }
+
+    /* ---- 팁 박스 ---- */
+    .tip {
+      display: flex;
+      gap: 10px;
+      background: var(--amber-l);
+      border-left: 4px solid var(--amber);
+      border-radius: 0 8px 8px 0;
+      padding: 12px 14px;
+      font-size: .83rem;
+      color: #78350f;
+      margin-top: 14px;
+    }
+    .tip-icon { flex-shrink: 0; font-size: 1rem; }
+
+    .note {
+      display: flex;
+      gap: 10px;
+      background: var(--blue-l);
+      border-left: 4px solid var(--blue);
+      border-radius: 0 8px 8px 0;
+      padding: 12px 14px;
+      font-size: .83rem;
+      color: #1e40af;
+      margin-top: 14px;
+    }
+
+    .success-box {
+      display: flex;
+      gap: 10px;
+      background: var(--green-l);
+      border-left: 4px solid var(--green);
+      border-radius: 0 8px 8px 0;
+      padding: 12px 14px;
+      font-size: .83rem;
+      color: #065f46;
+      margin-top: 14px;
+    }
+
+    /* ---- 테이블 ---- */
+    .guide-table { width: 100%; border-collapse: collapse; font-size: .85rem; margin-top: 12px; }
+    .guide-table th {
+      background: var(--bg);
+      padding: 9px 12px;
+      text-align: left;
+      font-weight: 700;
+      color: var(--gray);
+      border-bottom: 2px solid var(--border);
+    }
+    .guide-table td {
+      padding: 9px 12px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+      vertical-align: top;
+    }
+    .guide-table tr:last-child td { border-bottom: none; }
+
+    /* ---- 배지 ---- */
+    .badge {
+      display: inline-block;
+      padding: 1px 8px;
+      border-radius: 20px;
+      font-size: .72rem;
+      font-weight: 700;
+    }
+    .badge-blue  { background: #dbeafe; color: #1e40af; }
+    .badge-amber { background: var(--amber-l); color: #92400e; }
+    .badge-green { background: var(--green-l); color: #065f46; }
+    .badge-gray  { background: #f1f5f9; color: #475569; }
+
+    /* ---- 구분선 ---- */
+    .divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+
+    /* ---- 코드 ---- */
+    code {
+      background: #f1f5f9;
+      color: #d97706;
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: .82rem;
+      font-family: 'Courier New', monospace;
+    }
+
+    /* ---- 모바일 네비 바 ---- */
+    .mobile-nav {
+      display: none;
+      position: sticky;
+      top: 0;
+      z-index: 200;
+      background: #1d4ed8;
+      height: 52px;
+      padding: 0 16px;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .mobile-nav-title {
+      color: white;
+      font-size: .95rem;
+      font-weight: 700;
+      letter-spacing: -.01em;
+    }
+    .hamburger {
+      width: 40px;
+      height: 40px;
+      border: none;
+      background: rgba(255,255,255,.15);
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      cursor: pointer;
+      padding: 0;
+      transition: background .15s;
+    }
+    .hamburger:hover { background: rgba(255,255,255,.25); }
+    .hamburger span {
+      display: block;
+      width: 20px;
+      height: 2px;
+      background: white;
+      border-radius: 2px;
+      transition: transform .25s, opacity .25s;
+      transform-origin: center;
+    }
+    .hamburger.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+    .hamburger.open span:nth-child(2) { opacity: 0; }
+    .hamburger.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
+    /* ---- 드로어 오버레이 ---- */
+    .drawer-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.45);
+      z-index: 300;
+      opacity: 0;
+      transition: opacity .25s;
+    }
+    .drawer-overlay.open { opacity: 1; }
+
+    /* ---- 드로어 패널 ---- */
+    .drawer {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 270px;
+      height: 100%;
+      background: white;
+      z-index: 400;
+      transform: translateX(-100%);
+      transition: transform .28s cubic-bezier(.4,0,.2,1);
+      display: flex;
+      flex-direction: column;
+      box-shadow: 4px 0 20px rgba(0,0,0,.15);
+    }
+    .drawer.open { transform: translateX(0); }
+    .drawer-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 18px;
+      background: linear-gradient(135deg, #1d4ed8, #3b82f6);
+      color: white;
+    }
+    .drawer-header span { font-size: 1rem; font-weight: 700; }
+    .drawer-close {
+      width: 32px;
+      height: 32px;
+      border: none;
+      background: rgba(255,255,255,.2);
+      border-radius: 7px;
+      color: white;
+      font-size: 1.1rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background .15s;
+    }
+    .drawer-close:hover { background: rgba(255,255,255,.35); }
+    .drawer nav {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .drawer nav a {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 11px 12px;
+      border-radius: 8px;
+      font-size: .9rem;
+      color: var(--gray);
+      text-decoration: none;
+      transition: all .15s;
+    }
+    .drawer nav a:hover  { background: var(--blue-l); color: var(--blue); }
+    .drawer nav a.active { background: var(--blue-l); color: var(--blue); font-weight: 700; }
+    .drawer nav a .num {
+      width: 22px;
+      height: 22px;
+      background: var(--border);
+      border-radius: 50%;
+      font-size: .68rem;
+      font-weight: 700;
+      text-align: center;
+      line-height: 22px;
+      color: var(--gray);
+      flex-shrink: 0;
+    }
+    .drawer nav a.active .num { background: var(--blue); color: white; }
+
+    /* ---- 모바일 ---- */
+    @media (max-width: 700px) {
+      .mobile-nav  { display: flex; }
+      .layout      { grid-template-columns: 1fr; }
+      .sidebar     { display: none; }
+      .content     { padding: 20px 16px 60px; }
+      .section     { padding: 20px 18px; }
+      .site-header { padding: 28px 20px 24px; }
+      .site-header h1 { font-size: 1.3rem; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- 모바일 네비 바 -->
+<div class="mobile-nav">
+  <span class="mobile-nav-title">📅 사용 설명서</span>
+  <button class="hamburger" id="hamburger" onclick="toggleMenu()" aria-label="메뉴 열기">
+    <span></span><span></span><span></span>
+  </button>
+</div>
+
+<!-- 드로어 오버레이 -->
+<div class="drawer-overlay" id="drawer-overlay" onclick="closeMenu()"></div>
+
+<!-- 드로어 패널 -->
+<div class="drawer" id="drawer">
+  <div class="drawer-header">
+    <span>📋 목차</span>
+    <button class="drawer-close" onclick="closeMenu()" aria-label="메뉴 닫기">✕</button>
+  </div>
+  <nav id="drawer-nav">
+    <a href="#s1"  onclick="goTo('s1')"><span class="num">1</span>시작하기</a>
+    <a href="#s2"  onclick="goTo('s2')"><span class="num">2</span>이벤트 만들기</a>
+    <a href="#s3"  onclick="goTo('s3')"><span class="num">3</span>기본 정보</a>
+    <a href="#s4"  onclick="goTo('s4')"><span class="num">4</span>참가자 관리</a>
+    <a href="#s5"  onclick="goTo('s5')"><span class="num">5</span>참가자 통계</a>
+    <a href="#s6"  onclick="goTo('s6')"><span class="num">6</span>찬조 관리</a>
+    <a href="#s7"  onclick="goTo('s7')"><span class="num">7</span>운영진 관리</a>
+    <a href="#s8"  onclick="goTo('s8')"><span class="num">8</span>조편성</a>
+    <a href="#s9"  onclick="goTo('s9')"><span class="num">9</span>미리보기·내보내기</a>
+    <a href="#s10" onclick="goTo('s10')"><span class="num">10</span>참석 신청 페이지</a>
+    <a href="#s11" onclick="goTo('s11')"><span class="num">11</span>이벤트 템플릿</a>
+  </nav>
+</div>
+
+<!-- 헤더 -->
+<div class="site-header">
+  <div class="icon">📅</div>
+  <h1>이벤트 관리 시스템 사용 설명서</h1>
+  <p>배드민턴 대회·모임 등 이벤트를 처음부터 끝까지 관리하는 방법을 안내합니다.</p>
+</div>
+
+<div class="layout">
+
+  <!-- 사이드바 -->
+  <aside class="sidebar">
+    <div class="sidebar-title">목차</div>
+    <nav id="nav">
+      <a href="#s1"><span class="num">1</span>시작하기</a>
+      <a href="#s2"><span class="num">2</span>이벤트 만들기</a>
+      <a href="#s3"><span class="num">3</span>기본 정보</a>
+      <a href="#s4"><span class="num">4</span>참가자 관리</a>
+      <a href="#s5"><span class="num">5</span>참가자 통계</a>
+      <a href="#s6"><span class="num">6</span>찬조 관리</a>
+      <a href="#s7"><span class="num">7</span>운영진 관리</a>
+      <a href="#s8"><span class="num">8</span>조편성</a>
+      <a href="#s9"><span class="num">9</span>미리보기·내보내기</a>
+      <a href="#s10"><span class="num">10</span>참석 신청 페이지</a>
+      <a href="#s11"><span class="num">11</span>이벤트 템플릿</a>
+    </nav>
+  </aside>
+
+  <!-- 본문 -->
+  <main class="content">
+
+    <!-- 1. 시작하기 -->
+    <section class="section" id="s1">
+      <div class="section-badge">📌 시작하기</div>
+      <h2>로그인 및 첫 화면</h2>
+      <p class="desc">Firebase 계정으로 로그인하면 내 이벤트만 안전하게 관리할 수 있습니다.</p>
+
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-body"><strong>회원가입</strong> — 이메일과 비밀번호(6자 이상)를 입력하고 가입합니다.</div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-body"><strong>로그인</strong> — 이후 방문 시 이메일·비밀번호로 로그인하면 내 이벤트 목록이 나타납니다.</div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-body">헤더 우측 <strong>로그아웃</strong> 버튼으로 언제든지 안전하게 종료할 수 있습니다.</div>
+        </div>
+      </div>
+
+      <div class="note">
+        <span>ℹ️</span>
+        Firebase 미설정 상태에서도 앱을 사용할 수 있습니다. 이 경우 데이터는 브라우저 로컬 저장소에만 보관되며 다른 기기에서는 볼 수 없습니다.
+      </div>
+    </section>
+
+    <!-- 2. 이벤트 만들기 -->
+    <section class="section" id="s2">
+      <div class="section-badge">📅 이벤트</div>
+      <h2>이벤트 만들기 · 관리</h2>
+      <p class="desc">하나의 이벤트 안에 참가자, 찬조, 운영진, 조편성 데이터가 모두 묶입니다.</p>
+
+      <div class="feature-list">
+        <div class="feature-item">
+          <div class="feature-icon">＋</div>
+          <div class="feature-body">
+            <h3>새 이벤트 만들기</h3>
+            <p>이벤트 목록 화면에서 <strong>＋ 새 이벤트 만들기</strong> 버튼을 누릅니다. 제목은 필수, 나머지는 나중에 수정 가능합니다.</p>
+          </div>
+        </div>
+        <div class="feature-item">
+          <div class="feature-icon">✏️</div>
+          <div class="feature-body">
+            <h3>수정</h3>
+            <p>이벤트 카드의 <strong>✏️ 수정</strong> 버튼 또는 기본정보 탭의 수정 버튼으로 언제든지 내용을 변경할 수 있습니다.</p>
+          </div>
+        </div>
+        <div class="feature-item">
+          <div class="feature-icon">📋</div>
+          <div class="feature-body">
+            <h3>복사</h3>
+            <p>기존 이벤트를 그대로 복제합니다. 정기 대회처럼 같은 형식을 반복할 때 유용합니다.</p>
+          </div>
+        </div>
+        <div class="feature-item">
+          <div class="feature-icon">🗑</div>
+          <div class="feature-body">
+            <h3>삭제</h3>
+            <p>이벤트와 함께 참가자·찬조·운영진 데이터가 모두 삭제됩니다. <strong>되돌릴 수 없으니 주의하세요.</strong></p>
+          </div>
+        </div>
+      </div>
+
+      <hr class="divider">
+
+      <h3 style="font-size:.9rem;font-weight:700;margin-bottom:10px">이벤트 입력 항목</h3>
+      <table class="guide-table">
+        <thead><tr><th>항목</th><th>설명</th></tr></thead>
+        <tbody>
+          <tr><td><strong>이벤트 제목</strong> <span class="badge badge-blue">필수</span></td><td>목록과 헤더에 표시되는 이름</td></tr>
+          <tr><td>이벤트 내용</td><td>행사 소개 문구</td></tr>
+          <tr><td>이벤트 목적</td><td>친목, 실력 향상 등 목적</td></tr>
+          <tr><td>일자</td><td>YYYY-MM-DD 형식으로 자동 입력</td></tr>
+          <tr><td>장소</td><td>행사 장소명</td></tr>
+          <tr><td>주최/주관</td><td>클럽명 또는 단체명</td></tr>
+          <tr><td>안내사항</td><td>참가자에게 전달할 공지 (신청 페이지에도 표시)</td></tr>
+          <tr><td>참석 신청 옵션</td><td>운동 / 운동+회식 / 회식 중 원하는 항목 체크. 체크된 항목만 공개 신청 페이지에 표시됩니다.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- 3. 기본 정보 -->
+    <section class="section" id="s3">
+      <div class="section-badge">📋 기본정보 탭</div>
+      <h2>기본 정보 확인</h2>
+      <p class="desc">이벤트 상세 화면의 첫 번째 탭으로, 이벤트 요약 정보와 참석 신청 링크를 확인할 수 있습니다.</p>
+
+      <div class="feature-list">
+        <div class="feature-item">
+          <div class="feature-icon">📊</div>
+          <div class="feature-body">
+            <h3>현황 배지</h3>
+            <p>참가자 · 찬조자 · 운영진 현재 인원이 한눈에 표시됩니다.</p>
+          </div>
+        </div>
+        <div class="feature-item">
+          <div class="feature-icon">🔗</div>
+          <div class="feature-body">
+            <h3>참석 신청 링크</h3>
+            <p>참석 신청 옵션을 하나 이상 체크하면 공개 신청 링크가 생성됩니다. <strong>복사</strong> 버튼으로 링크를 복사해 카카오톡 등으로 공유하세요.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. 참가자 관리 -->
+    <section class="section" id="s4">
+      <div class="section-badge">👥 참가자 탭</div>
+      <h2>참가자 관리</h2>
+      <p class="desc">3가지 방법으로 참가자를 등록할 수 있으며, 중복 감지 기능이 자동으로 작동합니다.</p>
+
+      <div class="feature-list">
+        <div class="feature-item">
+          <div class="feature-icon">＋</div>
+          <div class="feature-body">
+            <h3>직접 추가</h3>
+            <p>한 명씩 이름·급수·성별·나이·경력·소속·연락처를 입력합니다.</p>
+          </div>
+        </div>
+        <div class="feature-item">
+          <div class="feature-icon">📋</div>
+          <div class="feature-body">
+            <h3>텍스트 붙여넣기</h3>
+            <p>엑셀에서 복사한 내용을 그대로 붙여넣으면 한 번에 여러 명을 등록합니다.<br>
+            컬럼 순서: <code>이름, 급수, 나이, 경력, 성별, 소속, 연락처, 비고</code><br>
+            구분자는 탭·쉼표·파이프(|) 모두 지원합니다.</p>
+          </div>
+        </div>
+        <div class="feature-item">
+          <div class="feature-icon">📁</div>
+          <div class="feature-body">
+            <h3>파일 업로드</h3>
+            <p>CSV, TXT, Excel(xlsx/xls) 파일을 직접 업로드해 일괄 등록합니다.</p>
+          </div>
+        </div>
+        <div class="feature-item">
+          <div class="feature-icon">⚠️</div>
+          <div class="feature-body">
+            <h3>중복 감지 <span class="badge badge-amber">자동</span></h3>
+            <p>같은 이름 또는 동일한 연락처가 이미 등록되어 있으면 경고창이 뜹니다. 계속 추가할지 취소할지 선택할 수 있습니다.</p>
+          </div>
+        </div>
+        <div class="feature-item">
+          <div class="feature-icon">⬇</div>
+          <div class="feature-body">
+            <h3>CSV 내보내기</h3>
+            <p>현재 참가자 명단 전체를 CSV 파일로 저장합니다.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="tip">
+        <span class="tip-icon">💡</span>
+        참석 구분(운동 / 운동+회식 / 회식)이 설정된 경우 참가자 목록이 그룹별로 구분되어 표시됩니다.
+      </div>
+    </section>
+
+    <!-- 5. 통계 -->
+    <section class="section" id="s5">
+      <div class="section-badge">📊 참가자 통계</div>
+      <h2>참가자 구성 통계</h2>
+      <p class="desc">참가자 탭 상단에 자동으로 표시되는 시각화 차트입니다.</p>
+
+      <div class="feature-list">
+        <div class="feature-item">
+          <div class="feature-icon">⚥</div>
+          <div class="feature-body">
+            <h3>성별 분포</h3>
+            <p>남 / 여 / 미설정 비율을 막대 차트로 표시합니다.</p>
+          </div>
+        </div>
+        <div class="feature-item">
+          <div class="feature-icon">🏅</div>
+          <div class="feature-body">
+            <h3>급수 분포</h3>
+            <p>S·A·B·C·D·초보 순으로 각 급수별 인원 비율을 표시합니다.</p>
+          </div>
+        </div>
+        <div class="feature-item">
+          <div class="feature-icon">🏃</div>
+          <div class="feature-body">
+            <h3>참석 구분 분포</h3>
+            <p>운동·운동+회식·회식 등 참석 구분별 인원을 표시합니다. 참석 구분이 없으면 자동으로 숨겨집니다.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="tip">
+        <span class="tip-icon">💡</span>
+        통계 섹션 제목을 클릭하면 접기·펼치기가 가능합니다.
+      </div>
+    </section>
+
+    <!-- 6. 찬조 -->
+    <section class="section" id="s6">
+      <div class="section-badge">🤝 찬조 탭</div>
+      <h2>찬조 관리</h2>
+      <p class="desc">찬조자와 찬조 물품을 함께 관리합니다.</p>
+
+      <div class="feature-list">
+        <div class="feature-item">
+          <div class="feature-icon">🤝</div>
+          <div class="feature-body">
+            <h3>찬조자 등록</h3>
+            <p>찬조자명·연락처·소속·찬조 구분(물품/현금/상품권/식품/기타)·메모를 입력합니다.</p>
+          </div>
+        </div>
+        <div class="feature-item">
+          <div class="feature-icon">🎁</div>
+          <div class="feature-body">
+            <h3>찬조 물품 등록</h3>
+            <p>찬조자 등록 시 물품을 함께 입력하거나, 찬조 물품 목록에서 별도로 추가할 수 있습니다. 물품명·수량·금액·사용처를 기록합니다.</p>
+          </div>
+        </div>
+        <div class="feature-item">
+          <div class="feature-icon">🔍</div>
+          <div class="feature-body">
+            <h3>이름·소속 검색</h3>
+            <p>찬조자 목록 상단의 검색창으로 빠르게 찾을 수 있습니다.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 7. 운영진 -->
+    <section class="section" id="s7">
+      <div class="section-badge">🛠 운영진 탭</div>
+      <h2>운영진 관리</h2>
+      <p class="desc">행사를 함께 진행하는 운영진을 역할별로 등록합니다.</p>
+
+      <table class="guide-table">
+        <thead><tr><th>역할</th><th>설명</th></tr></thead>
+        <tbody>
+          <tr><td>총괄</td><td>행사 전체 진행 책임자</td></tr>
+          <tr><td>진행</td><td>행사 당일 진행 담당</td></tr>
+          <tr><td>경기 운영</td><td>경기 일정·심판 관리</td></tr>
+          <tr><td>접수</td><td>참가자 현장 접수 담당</td></tr>
+          <tr><td>회계</td><td>참가비·찬조금 수납 담당</td></tr>
+          <tr><td>촬영</td><td>사진·영상 기록</td></tr>
+          <tr><td>안내</td><td>참가자 안내 및 유도</td></tr>
+          <tr><td>기타</td><td>위 항목에 없는 역할</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- 8. 조편성 -->
+    <section class="section" id="s8">
+      <div class="section-badge">🏟 조편성 탭</div>
+      <h2>조편성</h2>
+      <p class="desc">참가자를 조로 나누어 경기 일정을 자동 생성합니다.</p>
+
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-body"><strong>조 수 · 팀 수 설정</strong> — 몇 개의 조로 나눌지, 각 조는 몇 팀으로 구성할지 입력합니다.</div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-body"><strong>자동 배정</strong> — 급수·성별을 고려해 균형 있게 자동 배정합니다.</div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-body"><strong>수동 조정</strong> — PC에서는 드래그 앤 드롭, 모바일에서는 길게 눌러 조 이동 메뉴로 조원을 옮깁니다.</div>
+        </div>
+        <div class="step">
+          <div class="step-num">4</div>
+          <div class="step-body"><strong>경기 일정 확인</strong> — 각 조의 라운드별 대진표가 자동으로 생성됩니다.</div>
+        </div>
+      </div>
+
+      <div class="tip">
+        <span class="tip-icon">💡</span>
+        밸런스 바로 각 조의 급수 균형 상태를 한눈에 확인할 수 있습니다.
+      </div>
+    </section>
+
+    <!-- 9. 미리보기·내보내기 -->
+    <section class="section" id="s9">
+      <div class="section-badge">🌐 미리보기 탭</div>
+      <h2>미리보기 · 내보내기</h2>
+      <p class="desc">참가자에게 공유할 이벤트 결과물을 다양한 형태로 내보냅니다.</p>
+
+      <div class="feature-list">
+        <div class="feature-item">
+          <div class="feature-icon">👁</div>
+          <div class="feature-body">
+            <h3>공개 미리보기</h3>
+            <p>참가자·찬조자·운영진·조편성 등 표시할 항목을 체크박스로 선택하면 공개 페이지 형태의 미리보기가 실시간 업데이트됩니다.</p>
+          </div>
+        </div>
+        <div class="feature-item">
+          <div class="feature-icon">⬇</div>
+          <div class="feature-body">
+            <h3>HTML 다운로드</h3>
+            <p>미리보기 내용을 독립적인 HTML 파일로 저장합니다. 오프라인에서도 열 수 있습니다.</p>
+          </div>
+        </div>
+        <div class="feature-item">
+          <div class="feature-icon">📋</div>
+          <div class="feature-body">
+            <h3>텍스트 복사</h3>
+            <p>참가자 명단을 텍스트로 복사해 카카오톡 등 메신저에 바로 붙여넣을 수 있습니다.</p>
+          </div>
+        </div>
+        <div class="feature-item">
+          <div class="feature-icon">🖼</div>
+          <div class="feature-body">
+            <h3>이미지 저장</h3>
+            <p>미리보기 화면을 PNG 이미지로 저장합니다. 단체 카톡방에 공유하기 편합니다.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 10. 참석 신청 페이지 -->
+    <section class="section" id="s10">
+      <div class="section-badge">📝 참석 신청</div>
+      <h2>공개 참석 신청 페이지</h2>
+      <p class="desc">로그인 없이 누구나 접근할 수 있는 참가 신청 전용 페이지입니다.</p>
+
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-body">기본정보 탭에서 <strong>🔗 링크 복사</strong>로 신청 링크를 가져옵니다.</div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-body">링크를 카카오톡·문자로 참가자에게 공유합니다.</div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-body">참가자가 이름·성별·급수·나이·경력·<strong>연락처</strong>·참석 구분을 선택해 신청합니다.</div>
+        </div>
+        <div class="step">
+          <div class="step-num">4</div>
+          <div class="step-body">신청 내역이 즉시 참가자 탭에 반영됩니다.</div>
+        </div>
+      </div>
+
+      <hr class="divider">
+
+      <h3 style="font-size:.95rem;font-weight:700;margin-bottom:12px">🔍 신청 확인·수정</h3>
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-body">신청 페이지에서 <strong style="color:#f59e0b">🔍 신청 확인·수정</strong> 탭을 누릅니다.</div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-body">신청 시 입력한 <strong>이름</strong>과 <strong>연락처</strong>를 입력하고 조회합니다.</div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-body"><strong>✏️ 수정</strong>으로 정보를 변경하거나, <strong>🗑 신청 취소</strong>로 신청을 철회할 수 있습니다.</div>
+        </div>
+      </div>
+
+      <div class="tip">
+        <span class="tip-icon">💡</span>
+        연락처를 입력하지 않고 신청하면 이름만으로 조회되므로 동명이인이 있을 경우 정확한 구분이 어렵습니다. 연락처 입력을 권장하세요.
+      </div>
+
+      <div class="success-box">
+        <span>✅</span>
+        신청 페이지는 Firebase 없이도 동작합니다. Firebase 설정 시에는 실시간으로 데이터가 저장됩니다.
+      </div>
+    </section>
+
+    <!-- 11. 템플릿 -->
+    <section class="section" id="s11">
+      <div class="section-badge">💾 이벤트 템플릿</div>
+      <h2>이벤트 템플릿</h2>
+      <p class="desc">자주 쓰는 이벤트 설정을 저장해두고 새 이벤트 생성 시 바로 불러올 수 있습니다.</p>
+
+      <div class="feature-list">
+        <div class="feature-item">
+          <div class="feature-icon">💾</div>
+          <div class="feature-body">
+            <h3>템플릿 저장</h3>
+            <p>이벤트 생성·수정 모달에서 내용을 입력한 뒤 <strong>💾 저장</strong> 버튼을 누르고 템플릿 이름을 지정합니다. 주최·안내사항·참석 옵션이 저장됩니다.</p>
+          </div>
+        </div>
+        <div class="feature-item">
+          <div class="feature-icon">📂</div>
+          <div class="feature-body">
+            <h3>템플릿 불러오기</h3>
+            <p>이벤트 모달에서 드롭다운으로 저장된 템플릿을 선택한 뒤 <strong>불러오기</strong>를 누르면 해당 설정이 자동으로 채워집니다.</p>
+          </div>
+        </div>
+        <div class="feature-item">
+          <div class="feature-icon">🗑</div>
+          <div class="feature-body">
+            <h3>템플릿 삭제</h3>
+            <p>드롭다운에서 템플릿을 선택하면 나타나는 <strong>삭제</strong> 버튼으로 제거합니다.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="note">
+        <span>ℹ️</span>
+        템플릿은 브라우저 로컬 저장소에 보관됩니다. 다른 기기나 브라우저에서는 공유되지 않습니다.
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+  // ---- 햄버거 드로어 ----
+  const drawer  = document.getElementById('drawer');
+  const overlay = document.getElementById('drawer-overlay');
+  const burger  = document.getElementById('hamburger');
+
+  function openMenu() {
+    drawer.classList.add('open');
+    overlay.style.display = 'block';
+    requestAnimationFrame(() => overlay.classList.add('open'));
+    burger.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeMenu() {
+    drawer.classList.remove('open');
+    overlay.classList.remove('open');
+    burger.classList.remove('open');
+    document.body.style.overflow = '';
+    setTimeout(() => { overlay.style.display = 'none'; }, 260);
+  }
+
+  function toggleMenu() {
+    drawer.classList.contains('open') ? closeMenu() : openMenu();
+  }
+
+  function goTo(id) {
+    closeMenu();
+    setTimeout(() => {
+      const el = document.getElementById(id);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 280);
+  }
+
+  // ESC 키로 닫기
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMenu(); });
+
+  // ---- 스크롤 시 활성 링크 업데이트 (사이드바 + 드로어) ----
+  const sections     = document.querySelectorAll('.section');
+  const sidebarLinks = document.querySelectorAll('.sidebar a');
+  const drawerLinks  = document.querySelectorAll('#drawer-nav a');
+
+  function setActive(id) {
+    sidebarLinks.forEach(l => l.classList.toggle('active', l.getAttribute('href') === '#' + id));
+    drawerLinks.forEach(l  => l.classList.toggle('active', l.getAttribute('href') === '#' + id));
+  }
+
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(e => { if (e.isIntersecting) setActive(e.target.id); });
+  }, { threshold: 0.3 });
+
+  sections.forEach(s => observer.observe(s));
+</script>
+</body>
+</html>

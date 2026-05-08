@@ -10,6 +10,9 @@ body {
   min-height: 100vh;
 }
 
+/* ---- 헤더 사이드 (좌우 균형용) ---- */
+.header-side { min-width: 110px; }
+
 /* ---- 헤더 ---- */
 .app-header {
   background: linear-gradient(135deg, #1d4ed8, #3b82f6);
@@ -614,3 +617,71 @@ body {
 }
 .grp-swap-btn:hover { border-color: #3b82f6; color: #1d4ed8; background: #eff6ff; }
 .grp-swap-btn.bye   { border-color: #e2e8f0; color: #cbd5e1; }
+
+/* =====================================================
+   모바일 반응형 개선 (≤ 640px)
+   ===================================================== */
+@media (max-width: 640px) {
+  /* ---- 헤더 ---- */
+  .header-side { min-width: 0; }
+  #header-user-email { display: none; }
+  .header-back-btn { padding: 5px 10px; font-size: 0.78rem; }
+  .app-header h1 { font-size: 1rem; }
+
+  /* ---- 탭 버튼 ---- */
+  .tab-btn { padding: 7px 10px; font-size: 0.78rem; }
+
+  /* ---- 섹션 카드 ---- */
+  .section-card { padding: 14px; }
+
+  /* ---- 섹션 헤더: 타이틀과 버튼 그룹 세로 배치 ---- */
+  .section-header { flex-direction: column; align-items: flex-start; gap: 10px; }
+  .section-header > div { width: 100%; }
+
+  /* ---- 검색 입력: 전체 너비 ---- */
+  .search-input, .search-input:focus { width: 100%; }
+
+  /* ---- 이벤트 카드 버튼 ---- */
+  .event-card { padding: 14px; }
+  .event-card-actions .btn-sm { flex: 1 1 auto; justify-content: center; font-size: 0.78rem; }
+
+  /* ---- 모달 여백 ---- */
+  .modal-box { padding: 20px 16px; }
+
+  /* ---- 조편성 그리드: 1열 ---- */
+  .grp-grid { grid-template-columns: 1fr; }
+
+  /* ---- 참가자 테이블: 나이·경력·소속·연락처·비고 숨김 ---- */
+  #panel-participants .data-table th:nth-child(4),
+  #panel-participants .data-table td:nth-child(4),
+  #panel-participants .data-table th:nth-child(5),
+  #panel-participants .data-table td:nth-child(5),
+  #panel-participants .data-table th:nth-child(7),
+  #panel-participants .data-table td:nth-child(7),
+  #panel-participants .data-table th:nth-child(8),
+  #panel-participants .data-table td:nth-child(8),
+  #panel-participants .data-table th:nth-child(9),
+  #panel-participants .data-table td:nth-child(9) { display: none; }
+
+  /* ---- 찬조자 테이블(첫 번째 섹션): 연락처·소속·메모 숨김 ---- */
+  #panel-sponsors .section-card:first-child .data-table th:nth-child(3),
+  #panel-sponsors .section-card:first-child .data-table td:nth-child(3),
+  #panel-sponsors .section-card:first-child .data-table th:nth-child(4),
+  #panel-sponsors .section-card:first-child .data-table td:nth-child(4),
+  #panel-sponsors .section-card:first-child .data-table th:nth-child(6),
+  #panel-sponsors .section-card:first-child .data-table td:nth-child(6) { display: none; }
+
+  /* ---- 운영진 테이블: 연락처·담당업무·비고 숨김 ---- */
+  #panel-staff .data-table th:nth-child(4),
+  #panel-staff .data-table td:nth-child(4),
+  #panel-staff .data-table th:nth-child(5),
+  #panel-staff .data-table td:nth-child(5),
+  #panel-staff .data-table th:nth-child(6),
+  #panel-staff .data-table td:nth-child(6) { display: none; }
+}
+
+/* ---- 소형 화면(≤ 400px): 정보 그리드 1열 ---- */
+@media (max-width: 400px) {
+  .info-grid { grid-template-columns: 1fr; }
+  .app-header h1 { font-size: 0.9rem; }
+}

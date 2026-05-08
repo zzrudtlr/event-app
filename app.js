@@ -249,6 +249,7 @@ function openEventModal(eventId = null) {
   document.getElementById('opt-exercise').checked = opts.includes('운동');
   document.getElementById('opt-both').checked     = opts.includes('운동+회식');
   document.getElementById('opt-dinner').checked   = opts.includes('회식');
+  updateTemplateSelect();
   openModal('modal-event');
 }
 
@@ -452,6 +453,8 @@ function renderParticipants() {
       </div>
       <div class="table-wrap">${tableHTML}</div>
     </div>`;
+
+  panel.innerHTML = renderParticipantStats(App.participants) + panel.innerHTML;
 }
 
 function openParticipantModal(participantId = null) {
@@ -480,6 +483,18 @@ function openParticipantModal(participantId = null) {
 async function handleSaveParticipant() {
   const name = getVal('p-name').trim();
   if (!name) { showToast('이름을 입력하세요.', 'error'); return; }
+
+  // 중복 감지
+  const phone = getVal('p-phone').trim();
+  const dups = App.participants.filter(p => {
+    if (App.editingId && p.id === App.editingId) return false;
+    return p.name === name || (phone && p.phone && p.phone === phone);
+  });
+  if (dups.length) {
+    const info = dups.map(p => `${p.name}${p.phone ? ' (' + p.phone + ')' : ''}`).join('\n');
+    if (!confirm(`이미 등록된 참가자와 중복됩니다:\n${info}\n\n계속 추가하시겠습니까?`)) return;
+  }
+
   const data = {
     name, grade: getVal('p-grade').trim(),
     age: Number(getVal('p-age')) || '',
@@ -686,6 +701,10 @@ async function handlePasteImport() {
   const attendType = getVal('paste-attend-type') || getDefaultAttendType();
   const parsed = parseParticipantText(text).map(p => ({ ...p, attendType }));
   if (!parsed.length) { showToast('파싱된 참가자가 없습니다. 형식을 확인해주세요.', 'warning'); return; }
+  const dupNamesPaste = parsed
+    .filter(p => App.participants.some(ep => ep.name === p.name || (p.phone && ep.phone && ep.phone === p.phone)))
+    .map(p => p.name);
+  if (dupNamesPaste.length && !confirm(`다음 참가자가 이미 등록되어 있습니다:\n${dupNamesPaste.join(', ')}\n\n중복 포함하여 모두 추가하시겠습니까?`)) return;
   setBtnLoading('btn-paste-import', true);
   try {
     await addParticipantsBatch(App.eventId, parsed);
@@ -769,6 +788,13 @@ async function handleFileUpload() {
       return;
     }
     participants = participants.map(p => ({ ...p, attendType }));
+    const dupNamesFile = participants
+      .filter(p => App.participants.some(ep => ep.name === p.name || (p.phone && ep.phone && ep.phone === p.phone)))
+      .map(p => p.name);
+    if (dupNamesFile.length && !confirm(`다음 참가자가 이미 등록되어 있습니다:\n${dupNamesFile.join(', ')}\n\n중복 포함하여 모두 추가하시겠습니까?`)) {
+      setBtnLoading('btn-file-upload', false);
+      return;
+    }
     await addParticipantsBatch(App.eventId, participants);
     App.participants = await getParticipants(App.eventId);
     showToast(`${participants.length}명 추가되었습니다.`, 'success');
@@ -817,6 +843,80 @@ function parseExcelFile(file) {
     reader.onerror = () => reject(new Error('파일 읽기 실패'));
     reader.readAsArrayBuffer(file);
   });
+}
+
+// =====================================================
+// 참가자 통계 차트
+// =====================================================
+function toggleStats() {
+  const b = document.getElementById('stats-body');
+  const i = document.getElementById('stats-icon');
+  if (!b) return;
+  const hidden = b.style.display === 'none';
+  b.style.display = hidden ? '' : 'none';
+  if (i) i.textContent = hidden ? '▲' : '▼';
+}
+
+function renderParticipantStats(participants) {
+  if (!participants.length) return '';
+  const total = participants.length;
+
+  const count = (arr, key, fallback = '미설정') => {
+    const m = {};
+    arr.forEach(p => { const v = (p[key] || '').trim() || fallback; m[v] = (m[v] || 0) + 1; });
+    return m;
+  };
+
+  const genderMap  = count(participants, 'gender');
+  const gradeRaw   = count(participants, 'grade');
+  const attendMap  = participants.some(p => p.attendType) ? count(participants, 'attendType') : {};
+
+  const gradeOrder = ['S','A','B','C','D','초보','미설정'];
+  const sortedGrades = Object.entries(gradeRaw).sort((a, b) => {
+    const ai = gradeOrder.indexOf(a[0]), bi = gradeOrder.indexOf(b[0]);
+    return (ai < 0 ? 99 : ai) - (bi < 0 ? 99 : bi);
+  });
+
+  const genderColors = { '남':'#3b82f6', '여':'#ec4899', '미설정':'#94a3b8' };
+  const gradeColors  = { S:'#d97706', A:'#16a34a', B:'#2563eb', C:'#9333ea', D:'#dc2626', '초보':'#64748b', '미설정':'#94a3b8' };
+
+  const bar = (label, val, color) => {
+    const pct = Math.round((val / total) * 100);
+    return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
+      <div style="width:52px;font-size:.75rem;color:#475569;text-align:right;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(label)}">${esc(label)}</div>
+      <div style="flex:1;background:#f1f5f9;border-radius:3px;height:16px;overflow:hidden">
+        <div style="width:${pct}%;height:100%;background:${color};border-radius:3px"></div>
+      </div>
+      <div style="width:62px;font-size:.72rem;color:#64748b;flex-shrink:0">${val}명 (${pct}%)</div>
+    </div>`;
+  };
+
+  const hasGrade  = Object.keys(gradeRaw).some(g => g !== '미설정');
+  const hasAttend = Object.keys(attendMap).length > 0;
+
+  return `
+    <div class="section-card" style="margin-bottom:16px">
+      <div class="section-header" style="cursor:pointer;margin-bottom:0" onclick="toggleStats()">
+        <span class="section-title">📊 참가자 통계 <span style="font-size:.8rem;font-weight:400;color:#64748b">총 ${total}명</span></span>
+        <span id="stats-icon" style="font-size:.85rem;color:#94a3b8">▲</span>
+      </div>
+      <div id="stats-body" style="margin-top:14px">
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:20px">
+          <div>
+            <div style="font-size:.72rem;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">성별</div>
+            ${Object.entries(genderMap).map(([k,v]) => bar(k, v, genderColors[k]||'#94a3b8')).join('')}
+          </div>
+          ${hasGrade ? `<div>
+            <div style="font-size:.72rem;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">급수</div>
+            ${sortedGrades.map(([k,v]) => bar(k, v, gradeColors[k]||'#64748b')).join('')}
+          </div>` : ''}
+          ${hasAttend ? `<div>
+            <div style="font-size:.72rem;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">참석 구분</div>
+            ${Object.entries(attendMap).map(([k,v]) => bar(k, v, '#1d4ed8')).join('')}
+          </div>` : ''}
+        </div>
+      </div>
+    </div>`;
 }
 
 // =====================================================
@@ -1183,9 +1283,6 @@ function renderPreviewTab() {
           <button class="btn btn-primary btn-sm" onclick="handleExportHTML()">⬇ HTML 다운로드</button>
           <button class="btn btn-secondary btn-sm" onclick="copyPreviewText()">📋 텍스트 복사</button>
           <button class="btn btn-secondary btn-sm" onclick="downloadPreviewImage()">🖼 이미지 저장</button>
-          <button class="btn btn-secondary btn-sm" onclick="handleExportJSON()">⬇ JSON 백업</button>
-          <button class="btn btn-secondary btn-sm" onclick="handleExportParticipantsCSV()">⬇ 참가자 CSV</button>
-          <button class="btn btn-secondary btn-sm" onclick="handlePrint()">🖨 인쇄</button>
         </div>
       </div>
       <div style="display:flex;gap:16px;flex-wrap:wrap;padding:10px 14px;background:#f8fafc;border-radius:8px;margin-bottom:12px;align-items:center">
@@ -1339,6 +1436,76 @@ function handlePrint() {
   const d  = getPreviewData();
   const grpHTML = (App.previewSections.grouping && typeof grpBuildPublicHTML === 'function') ? grpBuildPublicHTML() : '';
   printPreview(ev, d.participants, d.sponsors, d.sponsorItems, d.staff, grpHTML);
+}
+
+// =====================================================
+// 이벤트 템플릿 (localStorage)
+// =====================================================
+function getTemplates() {
+  try { return JSON.parse(localStorage.getItem('eventTemplates') || '[]'); } catch { return []; }
+}
+
+function updateTemplateSelect() {
+  const sel = document.getElementById('template-select');
+  if (!sel) return;
+  const templates = getTemplates();
+  sel.innerHTML = '<option value="">— 저장된 템플릿 불러오기 —</option>' +
+    templates.map((t, i) => `<option value="${i}">${esc(t.name)}</option>`).join('');
+  const delBtn = document.getElementById('btn-delete-template');
+  if (delBtn) delBtn.classList.add('hidden');
+  sel.onchange = () => { if (delBtn) delBtn.classList.toggle('hidden', !sel.value); };
+}
+
+function loadTemplate() {
+  const sel = document.getElementById('template-select');
+  const idx = parseInt(sel?.value);
+  if (isNaN(idx)) { showToast('불러올 템플릿을 선택하세요.', 'warning'); return; }
+  const t = getTemplates()[idx];
+  if (!t) return;
+  if (t.organizer !== undefined) setVal('event-organizer', t.organizer);
+  if (t.notice    !== undefined) setVal('event-notice',    t.notice);
+  if (t.content   !== undefined) setVal('event-content',  t.content);
+  if (t.purpose   !== undefined) setVal('event-purpose',  t.purpose);
+  const opts = t.attendOptions || [];
+  document.getElementById('opt-exercise').checked = opts.includes('운동');
+  document.getElementById('opt-both').checked     = opts.includes('운동+회식');
+  document.getElementById('opt-dinner').checked   = opts.includes('회식');
+  showToast(`"${t.name}" 템플릿을 불러왔습니다.`, 'success');
+}
+
+function saveCurrentAsTemplate() {
+  const name = prompt('템플릿 이름을 입력하세요:', getVal('event-title') || '');
+  if (!name?.trim()) return;
+  const attendOptions = ['opt-exercise','opt-both','opt-dinner']
+    .filter(id => document.getElementById(id)?.checked)
+    .map(id => document.getElementById(id).value);
+  const t = {
+    name: name.trim(),
+    organizer:    getVal('event-organizer'),
+    notice:       getVal('event-notice'),
+    content:      getVal('event-content'),
+    purpose:      getVal('event-purpose'),
+    attendOptions,
+    savedAt: new Date().toISOString(),
+  };
+  const templates = getTemplates();
+  templates.push(t);
+  localStorage.setItem('eventTemplates', JSON.stringify(templates));
+  updateTemplateSelect();
+  showToast(`"${t.name}" 템플릿이 저장되었습니다.`, 'success');
+}
+
+function deleteSelectedTemplate() {
+  const sel = document.getElementById('template-select');
+  const idx = parseInt(sel?.value);
+  if (isNaN(idx)) return;
+  const templates = getTemplates();
+  const t = templates[idx];
+  if (!t || !confirm(`"${t.name}" 템플릿을 삭제하시겠습니까?`)) return;
+  templates.splice(idx, 1);
+  localStorage.setItem('eventTemplates', JSON.stringify(templates));
+  updateTemplateSelect();
+  showToast('템플릿이 삭제되었습니다.', 'success');
 }
 
 // =====================================================

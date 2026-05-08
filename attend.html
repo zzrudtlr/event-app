@@ -42,6 +42,9 @@
       grid-template-columns: 1fr 1fr;
       gap: 12px;
     }
+    @media (max-width: 380px) {
+      .form-row { grid-template-columns: 1fr; }
+    }
     .form-label {
       display: block;
       font-size: .8rem;
@@ -61,6 +64,16 @@
       outline: none;
       font-family: inherit;
       transition: border-color .15s;
+      box-sizing: border-box;
+    }
+    .form-select {
+      appearance: none;
+      -webkit-appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      padding-right: 36px;
+      cursor: pointer;
     }
     .form-input:focus, .form-select:focus {
       border-color: #3b82f6;
@@ -155,6 +168,50 @@
     /* 빈 상태 */
     .empty-state { text-align: center; padding: 40px 20px; color: #94a3b8; }
     .empty-state .icon { font-size: 2.5rem; margin-bottom: 10px; }
+
+    /* 탭 */
+    .tab-bar {
+      display: flex; gap: 4px; background: #f1f5f9;
+      padding: 4px; border-radius: 10px;
+    }
+    .tab-btn {
+      flex: 1; padding: 9px 12px; border-radius: 7px; border: none;
+      background: transparent; color: #64748b; font-size: .875rem;
+      font-weight: 500; cursor: pointer; font-family: inherit; transition: all .15s;
+    }
+    .tab-btn.active { background: white; color: #1d4ed8; font-weight: 700; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+
+    /* 신청 확인·수정 탭 — 앰버 강조 */
+    .tab-btn.lookup-tab { color: #92400e; }
+    .tab-btn.lookup-tab.active {
+      background: #fef3c7; color: #92400e;
+      font-weight: 700; box-shadow: 0 1px 3px rgba(0,0,0,.1);
+    }
+
+    /* 조회 패널 상단 배너 */
+    .lookup-banner {
+      background: linear-gradient(135deg, #fef3c7, #fde68a);
+      border-left: 4px solid #f59e0b;
+      border-radius: 8px;
+      padding: 12px 14px;
+      margin-bottom: 16px;
+      font-size: .875rem;
+      color: #78350f;
+    }
+
+    /* 조회 결과 카드 */
+    .lookup-card {
+      border: 1.5px solid #fde68a; border-radius: 10px;
+      padding: 14px 16px; margin-bottom: 10px;
+      background: #fffbeb;
+    }
+    .lookup-card-name { font-weight: 700; font-size: 1rem; color: #1e293b; }
+    .lookup-card-meta { font-size: .8rem; color: #92400e; margin-top: 4px; }
+    .lookup-card-actions { display: flex; gap: 6px; margin-top: 12px; flex-wrap: wrap; }
+
+    /* 조회 버튼 — 앰버 */
+    .btn-amber { background: #f59e0b; color: white; }
+    .btn-amber:hover:not(:disabled) { background: #d97706; }
   </style>
 </head>
 <body>
@@ -232,6 +289,39 @@ async function submitParticipant(eventId, data) {
   }
 }
 
+async function fetchParticipants(eventId) {
+  const res = await fetch(`${FS_BASE}/events/${eventId}/participants?key=${API_KEY}&pageSize=500`);
+  if (!res.ok) throw new Error('조회 실패 (' + res.status + ')');
+  const json = await res.json();
+  return (json.documents || []).map(doc => ({
+    id: doc.name.split('/').pop(),
+    ...parseFields(doc.fields)
+  }));
+}
+
+async function updateParticipantREST(eventId, docId, data) {
+  const fields = {};
+  const mask = [];
+  for (const [k, v] of Object.entries(data)) {
+    const f = toField(v);
+    if (f !== null) { fields[k] = f; mask.push(k); }
+  }
+  const maskStr = mask.map(k => `updateMask.fieldPaths=${encodeURIComponent(k)}`).join('&');
+  const res = await fetch(
+    `${FS_BASE}/events/${eventId}/participants/${docId}?key=${API_KEY}&${maskStr}`,
+    { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fields }) }
+  );
+  if (!res.ok) throw new Error('수정에 실패했습니다.');
+}
+
+async function deleteParticipantREST(eventId, docId) {
+  const res = await fetch(
+    `${FS_BASE}/events/${eventId}/participants/${docId}?key=${API_KEY}`,
+    { method: 'DELETE' }
+  );
+  if (!res.ok) throw new Error('취소에 실패했습니다.');
+}
+
 // =====================================================
 // 유틸
 // =====================================================
@@ -257,12 +347,13 @@ function setBtnLoading(id, loading) {
 // 초기화
 // =====================================================
 const eventId = new URLSearchParams(location.search).get('event');
+let currentEvent = null;
 
 async function init() {
   if (!eventId) { showError('URL에 이벤트 ID가 없습니다.'); return; }
   try {
-    const ev = await fetchEvent(eventId);
-    renderForm(ev);
+    currentEvent = await fetchEvent(eventId);
+    renderForm(currentEvent);
   } catch (e) {
     showError(e.message);
   }
@@ -275,7 +366,17 @@ function showError(msg) {
 }
 
 // =====================================================
-// 폼 렌더
+// 탭 전환
+// =====================================================
+function switchAttendTab(tab) {
+  ['register','lookup'].forEach(t => {
+    document.getElementById('tab-btn-' + t).classList.toggle('active', t === tab);
+    document.getElementById('panel-' + t).style.display = t === tab ? '' : 'none';
+  });
+}
+
+// =====================================================
+// 폼 렌더 (탭 래퍼)
 // =====================================================
 function renderForm(ev) {
   document.title = `참석 신청 — ${ev.title}`;
@@ -283,24 +384,33 @@ function renderForm(ev) {
   const meta = [ev.eventDate, ev.location, ev.organizer].filter(Boolean).join(' · ');
   document.getElementById('attend-meta').textContent = meta;
 
-  const opts = ev.attendOptions && ev.attendOptions.length
-    ? ev.attendOptions
-    : ['운동', '운동+회식', '회식'];
+  document.getElementById('attend-wrap').innerHTML = `
+    <div class="tab-bar" style="margin-bottom:20px">
+      <button id="tab-btn-register" class="tab-btn active"      onclick="switchAttendTab('register')">참석 신청</button>
+      <button id="tab-btn-lookup"   class="tab-btn lookup-tab"  onclick="switchAttendTab('lookup')">🔍 신청 확인·수정</button>
+    </div>
+    <div id="panel-register"></div>
+    <div id="panel-lookup"   style="display:none"></div>
+  `;
+  renderRegisterPanel(ev);
+  renderLookupPanel();
+}
 
+function renderRegisterPanel(ev) {
+  const opts = ev.attendOptions && ev.attendOptions.length
+    ? ev.attendOptions : ['운동', '운동+회식', '회식'];
   const optHTML = opts.map((o, i) => `
     <label class="attend-option-label">
       <input type="radio" name="attend-type" value="${esc(o)}" ${i === 0 ? 'checked' : ''}>
       <span>${esc(o)}</span>
     </label>`).join('');
 
-  document.getElementById('attend-wrap').innerHTML = `
+  document.getElementById('panel-register').innerHTML = `
     <p class="card-title">참석 신청</p>
-
     <div class="form-group">
       <label class="form-label">이름 <span class="required">*</span></label>
       <input id="att-name" class="form-input" type="text" placeholder="홍길동">
     </div>
-
     <div class="form-row">
       <div class="form-group">
         <label class="form-label">성별</label>
@@ -312,10 +422,17 @@ function renderForm(ev) {
       </div>
       <div class="form-group">
         <label class="form-label">급수</label>
-        <input id="att-grade" class="form-input" type="text" placeholder="A, B, C">
+        <select id="att-grade" class="form-select">
+          <option value="">선택</option>
+          <option value="초보">초보</option>
+          <option value="D">D</option>
+          <option value="C">C</option>
+          <option value="B">B</option>
+          <option value="A">A</option>
+          <option value="S">S</option>
+        </select>
       </div>
     </div>
-
     <div class="form-row">
       <div class="form-group">
         <label class="form-label">나이</label>
@@ -326,27 +443,53 @@ function renderForm(ev) {
         <input id="att-career" class="form-input" type="number" placeholder="3" min="0">
       </div>
     </div>
-
+    <div class="form-group">
+      <label class="form-label">연락처 <span style="font-weight:600;color:#f59e0b;background:#fef3c7;padding:2px 7px;border-radius:4px;font-size:.75rem">신청 확인·수정 시 필요</span></label>
+      <input id="att-phone" class="form-input" type="tel" placeholder="010-0000-0000">
+    </div>
     <div class="form-group" style="margin-top:4px">
       <label class="form-label">참석 구분 <span class="required">*</span></label>
-      <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
-        ${optHTML}
-      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">${optHTML}</div>
     </div>
-
     <button id="btn-submit" class="btn btn-primary"
       style="width:100%;padding:12px;font-size:.95rem;margin-top:20px"
       onclick="handleSubmit()">참석 신청하기</button>
   `;
 }
 
+function renderLookupPanel() {
+  document.getElementById('panel-lookup').innerHTML = `
+    <div class="lookup-banner">
+      📋 <strong>내 신청 확인·수정</strong><br>
+      <span style="font-size:.8rem">신청 시 입력한 이름으로 조회합니다. 연락처를 함께 입력하면 더 정확하게 찾을 수 있습니다.</span>
+    </div>
+    <div class="form-group">
+      <label class="form-label" style="color:#92400e;font-weight:700">이름 <span class="required">*</span></label>
+      <input id="lookup-name" class="form-input" type="text" placeholder="홍길동"
+             style="border-color:#fde68a;background:#fffbeb"
+             onfocus="this.style.borderColor='#f59e0b'"
+             onblur="this.style.borderColor='#fde68a'"
+             onkeydown="if(event.key==='Enter')handleLookup()">
+    </div>
+    <div class="form-group">
+      <label class="form-label" style="color:#92400e;font-weight:700">연락처 <span style="font-weight:400;color:#b45309">(선택 — 입력 시 정확도 향상)</span></label>
+      <input id="lookup-phone" class="form-input" type="tel" placeholder="010-0000-0000"
+             style="border-color:#fde68a;background:#fffbeb"
+             onfocus="this.style.borderColor='#f59e0b'"
+             onblur="this.style.borderColor='#fde68a'"
+             onkeydown="if(event.key==='Enter')handleLookup()">
+    </div>
+    <button class="btn btn-amber" style="width:100%;padding:11px;font-size:.95rem" onclick="handleLookup()">🔍 신청 조회</button>
+    <div id="lookup-result" style="margin-top:20px"></div>
+  `;
+}
+
 // =====================================================
-// 제출
+// 참석 신청 제출
 // =====================================================
 async function handleSubmit() {
   const name       = document.getElementById('att-name').value.trim();
   const attendType = document.querySelector('input[name="attend-type"]:checked')?.value;
-
   if (!name)       { showToast('이름을 입력하세요.', 'error'); return; }
   if (!attendType) { showToast('참석 구분을 선택하세요.', 'error'); return; }
 
@@ -356,13 +499,14 @@ async function handleSubmit() {
     grade:      document.getElementById('att-grade').value.trim(),
     age:        Number(document.getElementById('att-age').value) || '',
     career:     Number(document.getElementById('att-career').value) || '',
+    phone:      document.getElementById('att-phone').value.trim(),
     attendType,
   };
 
   setBtnLoading('btn-submit', true);
   try {
     await submitParticipant(eventId, data);
-    document.getElementById('attend-wrap').innerHTML = `
+    document.getElementById('panel-register').innerHTML = `
       <div style="text-align:center;padding:40px 0">
         <div style="font-size:3rem;margin-bottom:14px">✅</div>
         <p style="font-size:1.1rem;font-weight:700;color:#1e293b">참석 신청 완료!</p>
@@ -373,6 +517,127 @@ async function handleSubmit() {
   } catch (e) {
     showToast(e.message, 'error');
     setBtnLoading('btn-submit', false);
+  }
+}
+
+// =====================================================
+// 신청 조회 · 수정 · 취소
+// =====================================================
+async function handleLookup() {
+  const name  = document.getElementById('lookup-name').value.trim();
+  const phone = document.getElementById('lookup-phone').value.trim();
+  const resultEl = document.getElementById('lookup-result');
+  if (!name) { showToast('이름을 입력하세요.', 'error'); return; }
+
+  resultEl.innerHTML = `<div style="text-align:center;padding:20px;color:#94a3b8">🔍 조회 중...</div>`;
+  try {
+    const all = await fetchParticipants(eventId);
+    const matches = all.filter(p => {
+      if (p.name !== name) return false;
+      if (phone && p.phone && p.phone !== phone) return false;
+      return true;
+    });
+
+    if (!matches.length) {
+      resultEl.innerHTML = `<div style="text-align:center;padding:24px;color:#94a3b8">
+        <div style="font-size:2rem;margin-bottom:8px">🔎</div>
+        <p style="font-size:.875rem">일치하는 신청 내역이 없습니다.</p>
+        <p style="font-size:.8rem;margin-top:4px">이름을 정확히 입력하거나 연락처를 확인해 주세요.</p>
+      </div>`;
+      return;
+    }
+
+    resultEl.innerHTML = `
+      <p style="font-size:.8rem;color:#64748b;margin-bottom:10px">${matches.length}건의 신청 내역을 찾았습니다.</p>
+      ${matches.map(p => `
+        <div class="lookup-card">
+          <div class="lookup-card-name">${esc(p.name)}</div>
+          <div class="lookup-card-meta">
+            ${[p.attendType, p.gender, p.grade, p.age ? p.age + '세' : '', p.phone].filter(Boolean).join(' · ')}
+          </div>
+          <div class="lookup-card-actions">
+            <button class="btn btn-outline btn-sm" onclick="showEditForm('${p.id}', ${JSON.stringify(p).replace(/"/g,'&quot;')})">✏️ 수정</button>
+            <button class="btn btn-danger btn-sm"  onclick="handleCancel('${p.id}')">🗑 신청 취소</button>
+          </div>
+          <div id="edit-form-${p.id}"></div>
+        </div>`).join('')}`;
+  } catch (e) {
+    resultEl.innerHTML = `<p style="color:#ef4444;font-size:.875rem">${esc(e.message)}</p>`;
+  }
+}
+
+function showEditForm(docId, p) {
+  const ev   = currentEvent;
+  const opts = ev?.attendOptions?.length ? ev.attendOptions : ['운동','운동+회식','회식'];
+  const optHTML = opts.map(o => `
+    <label class="attend-option-label" style="padding:10px 14px">
+      <input type="radio" name="edit-attend-${docId}" value="${esc(o)}" ${p.attendType === o ? 'checked' : ''}>
+      <span>${esc(o)}</span>
+    </label>`).join('');
+
+  const el = document.getElementById('edit-form-' + docId);
+  if (el.innerHTML) { el.innerHTML = ''; return; } // 토글
+
+  el.innerHTML = `
+    <div style="border-top:1px solid #f1f5f9;margin-top:12px;padding-top:12px">
+      <div class="form-group">
+        <label class="form-label">이름</label>
+        <input id="edit-name-${docId}" class="form-input" type="text" value="${esc(p.name || '')}">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-group">
+          <label class="form-label">성별</label>
+          <select id="edit-gender-${docId}" class="form-select">
+            <option value="">선택</option>
+            <option value="남" ${p.gender==='남'?'selected':''}>남</option>
+            <option value="여" ${p.gender==='여'?'selected':''}>여</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">급수</label>
+          <input id="edit-grade-${docId}" class="form-input" type="text" value="${esc(p.grade || '')}">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">연락처</label>
+        <input id="edit-phone-${docId}" class="form-input" type="tel" value="${esc(p.phone || '')}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">참석 구분</label>
+        <div style="display:flex;flex-direction:column;gap:6px;margin-top:6px">${optHTML}</div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="btn btn-primary" style="flex:1" onclick="handleSaveEdit('${docId}')">저장</button>
+        <button class="btn btn-secondary" onclick="document.getElementById('edit-form-${docId}').innerHTML=''">취소</button>
+      </div>
+    </div>`;
+}
+
+async function handleSaveEdit(docId) {
+  const name      = document.getElementById('edit-name-' + docId)?.value.trim();
+  const gender    = document.getElementById('edit-gender-' + docId)?.value;
+  const grade     = document.getElementById('edit-grade-' + docId)?.value.trim();
+  const phone     = document.getElementById('edit-phone-' + docId)?.value.trim();
+  const attendType = document.querySelector(`input[name="edit-attend-${docId}"]:checked`)?.value;
+  if (!name) { showToast('이름을 입력하세요.', 'error'); return; }
+
+  try {
+    await updateParticipantREST(eventId, docId, { name, gender, grade, phone, attendType: attendType || '' });
+    showToast('수정되었습니다.', 'success');
+    handleLookup();
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
+}
+
+async function handleCancel(docId) {
+  if (!confirm('신청을 취소하시겠습니까?\n이 작업은 되돌릴 수 없습니다.')) return;
+  try {
+    await deleteParticipantREST(eventId, docId);
+    showToast('신청이 취소되었습니다.', 'success');
+    handleLookup();
+  } catch (e) {
+    showToast(e.message, 'error');
   }
 }
 
