@@ -6,16 +6,17 @@
 const App = {
   view: 'list',       // 'list' | 'detail'
   eventId: null,
-  tab: 'info',        // 'info' | 'participants' | 'sponsors' | 'sponsorItems' | 'staff' | 'preview'
+  tab: 'info',        // 'info' | 'participants' | 'sponsors' | 'sponsorItems' | 'staff' | 'schedule' | 'preview'
   events: [],
   participants: [],
   sponsors: [],
   sponsorItems: [],
   staff: [],
+  schedules: [],
   editingId: null,    // 현재 수정 중인 항목 ID
   sponsorSearch: '',  // 찬조자 검색어
   currentUser: null,
-  previewSections: { participants: true, sponsors: true, sponsorItems: true, staff: true, grouping: true },
+  previewSections: { participants: true, sponsors: true, sponsorItems: true, staff: true, grouping: true, schedule: true },
 };
 
 // =====================================================
@@ -213,17 +214,19 @@ async function navigateToDetail(eventId) {
 
 async function loadDetailData() {
   try {
-    const [p, s, si, st, ev] = await Promise.all([
+    const [p, s, si, st, ev, sch] = await Promise.all([
       getParticipants(App.eventId),
       getSponsors(App.eventId),
       getSponsorItems(App.eventId),
       getStaff(App.eventId),
       getEvent(App.eventId),
+      getSchedules(App.eventId),
     ]);
     App.participants = p;
     App.sponsors = s;
     App.sponsorItems = si;
     App.staff = st;
+    App.schedules = sch;
     if (ev) App.events = App.events.map(e => e.id === ev.id ? ev : e);
     switchTab(App.tab);
   } catch (e) {
@@ -325,6 +328,7 @@ function switchTab(tab) {
   if (tab === 'participants') renderParticipants();
   if (tab === 'sponsors') renderSponsors();
   if (tab === 'staff') renderStaff();
+  if (tab === 'schedule') renderScheduleTab();
   if (tab === 'preview') renderPreviewTab();
   if (tab === 'grouping') renderGroupingTab();
 }
@@ -1236,6 +1240,102 @@ async function handleDeleteStaff(staffId) {
 }
 
 // =====================================================
+// 스케줄 탭
+// =====================================================
+function getSortedSchedules() {
+  return [...App.schedules].sort((a, b) => {
+    if (a.startTime && b.startTime) return a.startTime.localeCompare(b.startTime);
+    if (a.startTime) return -1;
+    if (b.startTime) return 1;
+    return new Date(a.createdAt) - new Date(b.createdAt);
+  });
+}
+
+function renderScheduleTab() {
+  const sorted = getSortedSchedules();
+  const rows = sorted.length
+    ? sorted.map((s, i) => {
+        const timeRange = s.startTime
+          ? (s.endTime ? `${s.startTime} ~ ${s.endTime}` : s.startTime)
+          : '-';
+        return `<tr>
+          <td style="white-space:nowrap;font-weight:600;color:#1d4ed8">${timeRange}</td>
+          <td><strong>${esc(s.title)}</strong></td>
+          <td style="max-width:260px;white-space:pre-wrap;word-break:break-word">${esc(s.description || '-')}</td>
+          <td style="white-space:nowrap">
+            <button class="btn btn-secondary btn-sm btn-icon" onclick="openScheduleModal('${s.id}')">✏️</button>
+            <button class="btn btn-danger btn-sm btn-icon" onclick="handleDeleteSchedule('${s.id}')">🗑</button>
+          </td>
+        </tr>`;
+      }).join('')
+    : `<tr><td colspan="6"><div class="empty-state"><div class="icon">📅</div><p>등록된 일정이 없습니다.</p></div></td></tr>`;
+
+  document.getElementById('panel-schedule').innerHTML = `
+    <div class="section-card">
+      <div class="section-header">
+        <span class="section-title">📅 이벤트 스케줄 (${sorted.length}건)</span>
+        <button class="btn btn-primary btn-sm" onclick="openScheduleModal()">+ 일정 추가</button>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>시간</th><th>일정 제목</th><th>내용</th><th>관리</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+function openScheduleModal(scheduleId = null) {
+  App.editingId = scheduleId;
+  const s = scheduleId ? App.schedules.find(s => s.id === scheduleId) : null;
+  document.getElementById('schedule-modal-title').textContent = scheduleId ? '일정 수정' : '일정 추가';
+  setVal('sch-title', s?.title || '');
+  setVal('sch-start', s?.startTime || '');
+  setVal('sch-end', s?.endTime || '');
+  setVal('sch-description', s?.description || '');
+  openModal('modal-schedule');
+}
+
+async function handleSaveSchedule() {
+  const title = getVal('sch-title').trim();
+  if (!title) { showToast('일정 제목을 입력하세요.', 'error'); return; }
+  const data = {
+    title,
+    startTime:   getVal('sch-start'),
+    endTime:     getVal('sch-end'),
+    description: getVal('sch-description').trim(),
+  };
+  setBtnLoading('btn-save-schedule', true);
+  try {
+    if (App.editingId) {
+      await updateSchedule(App.eventId, App.editingId, data);
+      App.schedules = App.schedules.map(s => s.id === App.editingId ? { ...s, ...data } : s);
+    } else {
+      const id = await addSchedule(App.eventId, data);
+      App.schedules.push({ id, ...data });
+    }
+    showToast('저장되었습니다.', 'success');
+    closeModal('modal-schedule');
+    renderScheduleTab();
+  } catch (e) {
+    showToast('저장 실패: ' + e.message, 'error');
+  }
+  setBtnLoading('btn-save-schedule', false);
+}
+
+async function handleDeleteSchedule(scheduleId) {
+  if (!confirm('이 일정을 삭제하시겠습니까?')) return;
+  try {
+    await deleteSchedule(App.eventId, scheduleId);
+    App.schedules = App.schedules.filter(s => s.id !== scheduleId);
+    showToast('삭제되었습니다.', 'success');
+    renderScheduleTab();
+  } catch (e) {
+    showToast('삭제 실패: ' + e.message, 'error');
+  }
+}
+
+// =====================================================
 // 미리보기 / 내보내기 탭
 // =====================================================
 function getPreviewData() {
@@ -1245,6 +1345,7 @@ function getPreviewData() {
     sponsors:     sec.sponsors     ? App.sponsors     : null,
     sponsorItems: sec.sponsorItems ? App.sponsorItems : null,
     staff:        sec.staff        ? App.staff        : null,
+    schedules:    sec.schedule     ? getSortedSchedules() : null,
   };
 }
 
@@ -1255,12 +1356,13 @@ function onPreviewSectionToggle() {
     sponsorItems: document.getElementById('prev-show-sponsor-items').checked,
     staff:        document.getElementById('prev-show-staff').checked,
     grouping:     document.getElementById('prev-show-grouping').checked,
+    schedule:     document.getElementById('prev-show-schedule').checked,
   };
   const ev = App.events.find(e => e.id === App.eventId);
   const d  = getPreviewData();
   const grpHTML = (App.previewSections.grouping && typeof grpBuildPublicHTML === 'function') ? grpBuildPublicHTML() : '';
   const iframe  = document.getElementById('preview-iframe');
-  if (iframe) iframe.srcdoc = buildPublicHTML(ev, d.participants, d.sponsors, d.sponsorItems, d.staff, grpHTML);
+  if (iframe) iframe.srcdoc = buildPublicHTML(ev, d.participants, d.sponsors, d.sponsorItems, d.staff, grpHTML, d.schedules);
 }
 
 function renderPreviewTab() {
@@ -1287,6 +1389,7 @@ function renderPreviewTab() {
       </div>
       <div style="display:flex;gap:16px;flex-wrap:wrap;padding:10px 14px;background:#f8fafc;border-radius:8px;margin-bottom:12px;align-items:center">
         <span style="font-size:.8rem;font-weight:600;color:#64748b">표시 항목:</span>
+        ${chk('prev-show-schedule',    'schedule',     '📅 스케줄')}
         ${chk('prev-show-participants', 'participants', '👥 참가자')}
         ${chk('prev-show-sponsors',    'sponsors',     '🤝 찬조자')}
         ${chk('prev-show-sponsor-items','sponsorItems','🎁 찬조물품')}
@@ -1300,7 +1403,7 @@ function renderPreviewTab() {
 
   const d       = getPreviewData();
   const grpHTML = (sec.grouping && typeof grpBuildPublicHTML === 'function') ? grpBuildPublicHTML() : '';
-  const html    = buildPublicHTML(ev, d.participants, d.sponsors, d.sponsorItems, d.staff, grpHTML);
+  const html    = buildPublicHTML(ev, d.participants, d.sponsors, d.sponsorItems, d.staff, grpHTML, d.schedules);
   const iframe  = document.getElementById('preview-iframe');
   iframe.srcdoc = html;
   iframe.style.height = '700px';
@@ -1363,6 +1466,14 @@ function copyPreviewText() {
     });
   }
 
+  if (d.schedules !== null && d.schedules.length) {
+    lines.push(`\n📅 스케줄 (${d.schedules.length}건)`);
+    d.schedules.forEach(s => {
+      const time = s.startTime ? (s.endTime ? `${s.startTime}~${s.endTime}` : s.startTime) : '';
+      lines.push(`  ${time ? '[' + time + '] ' : ''}${s.title}${s.description ? ' — ' + s.description : ''}`);
+    });
+  }
+
   if (d.staff !== null && d.staff.length) {
     lines.push(`\n🛠 운영진 (${d.staff.length}명)`);
     d.staff.forEach((s, i) => {
@@ -1421,7 +1532,7 @@ function handleExportHTML() {
   const ev = App.events.find(e => e.id === App.eventId);
   const d  = getPreviewData();
   const grpHTML = (App.previewSections.grouping && typeof grpBuildPublicHTML === 'function') ? grpBuildPublicHTML() : '';
-  exportAsHTML(ev, d.participants, d.sponsors, d.sponsorItems, d.staff, grpHTML);
+  exportAsHTML(ev, d.participants, d.sponsors, d.sponsorItems, d.staff, grpHTML, d.schedules);
 }
 function handleExportJSON() {
   const ev = App.events.find(e => e.id === App.eventId);
@@ -1435,7 +1546,7 @@ function handlePrint() {
   const ev = App.events.find(e => e.id === App.eventId);
   const d  = getPreviewData();
   const grpHTML = (App.previewSections.grouping && typeof grpBuildPublicHTML === 'function') ? grpBuildPublicHTML() : '';
-  printPreview(ev, d.participants, d.sponsors, d.sponsorItems, d.staff, grpHTML);
+  printPreview(ev, d.participants, d.sponsors, d.sponsorItems, d.staff, grpHTML, d.schedules);
 }
 
 // =====================================================

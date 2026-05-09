@@ -178,6 +178,7 @@ service cloud.firestore {
       <button class="tab-btn" data-tab="sponsors"     onclick="switchTab('sponsors')">🤝 찬조</button>
       <button class="tab-btn" data-tab="staff"        onclick="switchTab('staff')">🛠 운영진</button>
       <button class="tab-btn" data-tab="grouping"    onclick="switchTab('grouping')">🏟 조편성</button>
+      <button class="tab-btn" data-tab="schedule"    onclick="switchTab('schedule')">📅 스케줄</button>
       <button class="tab-btn" data-tab="preview"      onclick="switchTab('preview')">🌐 미리보기</button>
     </div>
   </div>
@@ -190,6 +191,7 @@ service cloud.firestore {
     <div id="panel-staff"        class="tab-panel hidden"  data-tab="staff"></div>
     <div id="panel-preview"      class="tab-panel hidden"  data-tab="preview"></div>
     <div id="panel-grouping"     class="tab-panel hidden"  data-tab="grouping"></div>
+    <div id="panel-schedule"     class="tab-panel hidden"  data-tab="schedule"></div>
   </div>
 
 </div>
@@ -549,6 +551,41 @@ service cloud.firestore {
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:4px">
       <button class="btn btn-secondary" onclick="closeModal('modal-staff')">취소</button>
       <button id="btn-save-staff" class="btn btn-primary" onclick="handleSaveStaff()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     모달: 스케줄 항목 추가 / 수정
+     ============================================================ -->
+<div id="modal-schedule" class="modal-overlay" role="dialog" aria-modal="true">
+  <div class="modal-box">
+    <h2 id="schedule-modal-title" class="modal-title">일정 추가</h2>
+
+    <div class="form-group">
+      <label class="form-label" for="sch-title">일정 제목 <span class="required">*</span></label>
+      <input id="sch-title" class="form-input" type="text" placeholder="예: 개회식">
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label" for="sch-start">시작 시간</label>
+        <input id="sch-start" class="form-input" type="time">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="sch-end">종료 시간</label>
+        <input id="sch-end" class="form-input" type="time">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="sch-description">내용</label>
+      <textarea id="sch-description" class="form-textarea" placeholder="일정에 대한 상세 내용" rows="2"></textarea>
+    </div>
+
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:4px">
+      <button class="btn btn-secondary" onclick="closeModal('modal-schedule')">취소</button>
+      <button id="btn-save-schedule" class="btn btn-primary" onclick="handleSaveSchedule()">저장</button>
     </div>
   </div>
 </div>

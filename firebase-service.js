@@ -100,6 +100,7 @@ async function deleteEvent(eventId) {
     await deleteSubcollection(eventId, 'sponsors');
     await deleteSubcollection(eventId, 'sponsorItems');
     await deleteSubcollection(eventId, 'staff');
+    await deleteSubcollection(eventId, 'schedules');
     await db.collection('events').doc(eventId).delete();
     return;
   }
@@ -109,6 +110,7 @@ async function deleteEvent(eventId) {
   localStorage.removeItem(`sponsors_${eventId}`);
   localStorage.removeItem(`sponsorItems_${eventId}`);
   localStorage.removeItem(`staff_${eventId}`);
+  localStorage.removeItem(`schedules_${eventId}`);
 }
 
 async function duplicateEvent(eventId) {
@@ -351,4 +353,56 @@ async function deleteStaff(eventId, staffId) {
   }
   let list = localGet(`staff_${eventId}`);
   localSet(`staff_${eventId}`, list.filter(s => s.id !== staffId));
+}
+
+// =====================================================
+// SCHEDULES
+// =====================================================
+
+async function getSchedules(eventId) {
+  if (firebaseEnabled && db) {
+    const snap = await db.collection('events').doc(eventId)
+      .collection('schedules').orderBy('createdAt', 'asc').get();
+    return snap.docs.map(doc => ({
+      id: doc.id, ...doc.data(),
+      createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || doc.data().createdAt,
+    }));
+  }
+  return localGet(`schedules_${eventId}`);
+}
+
+async function addSchedule(eventId, data) {
+  const ts = nowISO();
+  if (firebaseEnabled && db) {
+    const ref = await db.collection('events').doc(eventId)
+      .collection('schedules').add({ ...data, createdAt: serverTs() });
+    return ref.id;
+  }
+  const id = localId();
+  const list = localGet(`schedules_${eventId}`);
+  list.push({ id, ...data, createdAt: ts });
+  localSet(`schedules_${eventId}`, list);
+  return id;
+}
+
+async function updateSchedule(eventId, scheduleId, data) {
+  if (firebaseEnabled && db) {
+    await db.collection('events').doc(eventId)
+      .collection('schedules').doc(scheduleId).update(data);
+    return;
+  }
+  const list = localGet(`schedules_${eventId}`);
+  const idx = list.findIndex(s => s.id === scheduleId);
+  if (idx !== -1) list[idx] = { ...list[idx], ...data };
+  localSet(`schedules_${eventId}`, list);
+}
+
+async function deleteSchedule(eventId, scheduleId) {
+  if (firebaseEnabled && db) {
+    await db.collection('events').doc(eventId)
+      .collection('schedules').doc(scheduleId).delete();
+    return;
+  }
+  let list = localGet(`schedules_${eventId}`);
+  localSet(`schedules_${eventId}`, list.filter(s => s.id !== scheduleId));
 }

@@ -4,8 +4,8 @@
 // =====================================================
 
 // HTML 파일로 내보내기 (공유용 상세 페이지)
-function exportAsHTML(event, participants, sponsors, sponsorItems, staff, groupingHTML) {
-  const html = buildPublicHTML(event, participants, sponsors, sponsorItems, staff, groupingHTML);
+function exportAsHTML(event, participants, sponsors, sponsorItems, staff, groupingHTML, schedules) {
+  const html = buildPublicHTML(event, participants, sponsors, sponsorItems, staff, groupingHTML, schedules);
   const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -60,8 +60,8 @@ function downloadCSV(rows, filename) {
 }
 
 // 인쇄
-function printPreview(event, participants, sponsors, sponsorItems, staff, groupingHTML) {
-  const html = buildPublicHTML(event, participants, sponsors, sponsorItems, staff, groupingHTML);
+function printPreview(event, participants, sponsors, sponsorItems, staff, groupingHTML, schedules) {
+  const html = buildPublicHTML(event, participants, sponsors, sponsorItems, staff, groupingHTML, schedules);
   const w = window.open('', '_blank');
   w.document.write(html);
   w.document.close();
@@ -76,9 +76,34 @@ function sanitizeFilename(name) {
 // =====================================================
 // 공개용 HTML 생성
 // =====================================================
-function buildPublicHTML(event, participants, sponsors, sponsorItems, staff, groupingHTML) {
+function buildPublicHTML(event, participants, sponsors, sponsorItems, staff, groupingHTML, schedules) {
   const formatDate = (d) => d ? d.replace(/-/g, '.') : '-';
   const safe = (v) => String(v || '-').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+  const schedulesSection = (schedules !== null && schedules !== undefined) ? (() => {
+    if (!schedules.length) return '';
+    const rows = schedules.map(s => {
+      const timeRange = s.startTime
+        ? (s.endTime ? `${s.startTime} ~ ${s.endTime}` : s.startTime)
+        : '-';
+      return `
+        <tr>
+          <td style="white-space:nowrap;font-weight:600;color:#1d4ed8">${safe(timeRange)}</td>
+          <td><strong>${safe(s.title)}</strong></td>
+          <td style="white-space:pre-wrap">${safe(s.description)}</td>
+        </tr>`;
+    }).join('');
+    return `
+  <div class="card">
+    <h2>📅 이벤트 스케줄 (${schedules.length}건)</h2>
+    <div style="overflow-x:auto">
+      <table>
+        <thead><tr><th>시간</th><th>일정</th><th>내용</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  </div>`;
+  })() : '';
 
   const participantsSection = participants !== null ? (() => {
     const rows = participants.length
@@ -244,6 +269,7 @@ function buildPublicHTML(event, participants, sponsors, sponsorItems, staff, gro
     ${event.notice ? `<div style="margin-top:16px"><label style="font-size:.8rem;color:#64748b;font-weight:600;display:block;margin-bottom:6px">안내사항</label><div class="notice-box">${safe(event.notice)}</div></div>` : ''}
   </div>
 
+  ${schedulesSection}
   ${participantsSection}
   ${sponsorsSection}
   ${sponsorItemsSection}
